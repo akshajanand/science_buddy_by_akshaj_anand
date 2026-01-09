@@ -3,7 +3,13 @@ import { QuizQuestion, PuzzleWord, ChatSession, MatchingPair, PodcastSegment } f
 
 // --- CORE GROQ CONFIGURATION ---
 
-const GROQ_MODEL = "llama-3.3-70b-versatile";
+// Priority list of models to use. If one fails, the app automatically switches to the next.
+const BACKUP_MODELS = [
+    "llama-3.3-70b-versatile", // Primary: Highest Intelligence
+    "llama-3.1-8b-instant",    // Secondary: Ultra Fast, good for basic chat
+    "mixtral-8x7b-32768",      // Tertiary: Reliable Fallback
+    "gemma2-9b-it"             // Final Resort
+];
 
 let cachedGroqKey: string | null = null;
 
@@ -32,7 +38,7 @@ const getGroqApiKey = async () => {
 
 /**
  * Core function to communicate with Groq API.
- * Handles JSON mode enforcement and error parsing.
+ * Handles JSON mode enforcement, error parsing, and AUTOMATIC RETRIES with FALLBACK MODELS.
  */
 const callGroqAPI = async (
     messages: { role: string; content: string }[],
@@ -45,39 +51,71 @@ const callGroqAPI = async (
         return null;
     }
 
-    try {
-        const body: any = {
-            model: GROQ_MODEL,
-            messages: messages,
-            temperature: temperature,
-            max_tokens: 8096 // Increased for Research payload
-        };
+    // Attempt to get a response using the models in priority order
+    for (let i = 0; i < BACKUP_MODELS.length; i++) {
+        const model = BACKUP_MODELS[i];
+        
+        try {
+            const body: any = {
+                model: model,
+                messages: messages,
+                temperature: temperature,
+                max_tokens: 8096
+            };
 
-        if (jsonMode) {
-            body.response_format = { type: "json_object" };
+            if (jsonMode) {
+                body.response_format = { type: "json_object" };
+            }
+
+            const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${apiKey}`,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(body)
+            });
+
+            if (!response.ok) {
+                const status = response.status;
+                
+                // If Rate Limited (429), wait briefly and try the next model (which might be on a different shard)
+                if (status === 429) {
+                    console.warn(`Groq Rate Limit on ${model}. Switching to backup...`);
+                    await new Promise(r => setTimeout(r, 1200)); // 1.2s delay
+                    continue; // Try next model
+                }
+                
+                // If Server Error (5xx), try next model immediately
+                if (status >= 500) {
+                    console.warn(`Groq Server Error (${status}) on ${model}. Switching...`);
+                    continue;
+                }
+
+                // For other errors (400, 401), logging it and trying next just in case it's a model specific issue
+                console.warn(`Groq API Error (${status}) on ${model}.`);
+                continue;
+            }
+
+            const data = await response.json();
+            const content = data.choices?.[0]?.message?.content;
+            
+            if (content) return content;
+            
+            // If content is empty/null, try next model
+            console.warn(`Empty response from ${model}`);
+            continue;
+
+        } catch (e) {
+            console.warn(`Connection Failed for ${model}`, e);
+            // Network error, try next model
+            continue; 
         }
-
-        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-            method: "POST",
-            headers: {
-                "Authorization": `Bearer ${apiKey}`,
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify(body)
-        });
-
-        if (!response.ok) {
-            console.warn(`Groq API Error: ${response.status} ${response.statusText}`);
-            return null;
-        }
-
-        const data = await response.json();
-        return data.choices?.[0]?.message?.content || null;
-
-    } catch (e) {
-        console.warn("Groq Connection Failed", e);
-        return null;
     }
+    
+    // If all models failed
+    console.error("All AI Models failed to respond.");
+    return null;
 };
 
 /**
