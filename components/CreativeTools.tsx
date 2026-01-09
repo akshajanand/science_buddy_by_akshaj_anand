@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { BookOpen, Sparkles, Network, ArrowRight } from 'lucide-react';
 import { generateStoryNode, rewriteText, generateConceptMapData } from '../services/aiService';
 import { StoryNode, ConceptNode } from '../types';
+import { renderRichText } from '../utils/textUtils';
 
 // --- Story Component ---
 export const InteractiveStory: React.FC = () => {
@@ -9,10 +10,12 @@ export const InteractiveStory: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [started, setStarted] = useState(false);
   const [history, setHistory] = useState<string>('');
+  const [topic, setTopic] = useState('');
 
   const handleStart = async () => {
+    if (!topic) return;
     setLoading(true);
-    const data = await generateStoryNode('', null);
+    const data = await generateStoryNode('', null, topic);
     if (data) {
         setNode({ ...data, id: 'start' });
         setHistory(data.text);
@@ -36,14 +39,25 @@ export const InteractiveStory: React.FC = () => {
           <div className="flex flex-col items-center justify-center h-full text-center p-8">
               <BookOpen size={64} className="mb-4 text-purple-300" />
               <h2 className="text-3xl font-bold mb-4">Scientific Adventure</h2>
-              <p className="mb-8 max-w-md">Embark on a journey through the microscopic world or deep space. Your choices determine the outcome!</p>
-              <button 
-                onClick={handleStart} 
-                disabled={loading}
-                className="glass-button px-8 py-4 rounded-full text-xl font-bold"
-              >
-                  {loading ? 'Generating World...' : 'Start Adventure'}
-              </button>
+              <p className="mb-8 max-w-md">Embark on a journey through any scientific concept. Your choices determine the outcome!</p>
+              
+              <div className="w-full max-w-md space-y-4">
+                  <input 
+                    type="text" 
+                    value={topic}
+                    onChange={(e) => setTopic(e.target.value)}
+                    placeholder="Enter Adventure Topic (e.g. Inside a Volcano)"
+                    className="w-full bg-white/10 border border-white/20 rounded-xl px-6 py-4 text-lg focus:outline-none focus:border-purple-400 placeholder-white/40"
+                    onKeyDown={(e) => e.key === 'Enter' && handleStart()}
+                  />
+                  <button 
+                    onClick={handleStart} 
+                    disabled={loading || !topic}
+                    className="w-full glass-button px-8 py-4 rounded-xl text-xl font-bold flex items-center justify-center gap-2"
+                  >
+                      {loading ? 'Generating World...' : 'Start Adventure'}
+                  </button>
+              </div>
           </div>
       );
   }
@@ -135,7 +149,7 @@ export const StyleSwapper: React.FC = () => {
             <div className="flex-1 flex flex-col gap-4">
                 <h3 className="text-xl font-bold flex items-center gap-2"><Sparkles size={20}/> {style} Version</h3>
                 <div className="flex-1 w-full glass-panel bg-black/20 rounded-xl p-4 overflow-y-auto">
-                    {output || <span className="opacity-50 italic">Magic result will appear here...</span>}
+                    {output ? renderRichText(output) : <span className="opacity-50 italic">Magic result will appear here...</span>}
                 </div>
             </div>
         </div>

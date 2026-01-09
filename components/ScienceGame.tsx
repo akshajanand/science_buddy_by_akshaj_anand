@@ -16,6 +16,7 @@ interface Particle {
 
 const ScienceGame: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [gameState, setGameState] = useState<'START' | 'PLAYING' | 'GAME_OVER'>('START');
   const [score, setScore] = useState(0);
   
@@ -24,7 +25,7 @@ const ScienceGame: React.FC = () => {
   const obstaclesRef = useRef<{x: number, y: number, w: number, h: number, type: 'BAD'}[]>([]);
   const collectiblesRef = useRef<{x: number, y: number, w: number, h: number, active: boolean}[]>([]);
   const scoreRef = useRef(0);
-  const frameRef = useRef(0);
+  const animationRef = useRef<number>(0);
 
   const resetGame = () => {
     playerRef.current = { x: 50, y: 200, width: 30, height: 30, dy: 0, grounded: false };
@@ -42,13 +43,24 @@ const ScienceGame: React.FC = () => {
     }
   };
 
+  // Handle Resize
+  useEffect(() => {
+    const resizeCanvas = () => {
+        if(containerRef.current && canvasRef.current) {
+            canvasRef.current.width = containerRef.current.clientWidth;
+            canvasRef.current.height = 300; // Fixed height
+        }
+    };
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+    return () => window.removeEventListener('resize', resizeCanvas);
+  }, []);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-
-    let animationId: number;
 
     const gameLoop = () => {
       if (gameState !== 'PLAYING') return;
@@ -162,14 +174,14 @@ const ScienceGame: React.FC = () => {
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, height - 20, width, 20);
 
-      animationId = requestAnimationFrame(gameLoop);
+      animationRef.current = requestAnimationFrame(gameLoop);
     };
 
     if (gameState === 'PLAYING') {
-      animationId = requestAnimationFrame(gameLoop);
+      animationRef.current = requestAnimationFrame(gameLoop);
     }
 
-    return () => cancelAnimationFrame(animationId);
+    return () => cancelAnimationFrame(animationRef.current);
   }, [gameState]);
 
   // Keyboard controls
@@ -179,8 +191,15 @@ const ScienceGame: React.FC = () => {
               jump();
           }
       }
+      
+      const handleTouch = () => jump();
+
       window.addEventListener('keydown', handleKeyDown);
-      return () => window.removeEventListener('keydown', handleKeyDown);
+      window.addEventListener('touchstart', handleTouch);
+      return () => {
+          window.removeEventListener('keydown', handleKeyDown);
+          window.removeEventListener('touchstart', handleTouch);
+      }
   }, [gameState]);
 
   return (
@@ -190,12 +209,10 @@ const ScienceGame: React.FC = () => {
           Score: {score}
       </div>
 
-      <div className="relative border-4 border-white/20 rounded-lg overflow-hidden bg-slate-900/50 backdrop-blur-sm">
+      <div ref={containerRef} className="w-full max-w-2xl relative border-4 border-white/20 rounded-lg overflow-hidden bg-slate-900/50 backdrop-blur-sm">
         <canvas 
           ref={canvasRef} 
-          width={600} 
-          height={300}
-          className="block"
+          className="block w-full h-[300px]"
           onClick={jump}
         />
         
@@ -218,7 +235,7 @@ const ScienceGame: React.FC = () => {
             </div>
         )}
       </div>
-      <p className="mt-4 opacity-70">Press SPACE, UP ARROW, or CLICK to jump.</p>
+      <p className="mt-4 opacity-70">Tap, Click, or Press SPACE to jump.</p>
     </div>
   );
 };
