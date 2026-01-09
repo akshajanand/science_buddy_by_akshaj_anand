@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Mic, Loader2, History, Plus, X, Trash2 } from 'lucide-react';
 import { speechManager } from '../utils/audioUtils';
-import { chatWithAIVoice, generateTitle } from '../services/aiService';
+import { chatWithAIVoice, generateTitle, fetchLiveUserStats } from '../services/aiService';
 import { supabase } from '../services/supabaseClient';
 import { ChatSession, ChatMessage } from '../types';
+import { showToast } from '../utils/notificationUtils';
 
 interface VoiceChatProps {
     userProfile: { name?: string | null, interests?: string };
@@ -42,23 +43,31 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ userProfile, userId, initialSessi
             setIsLoading(true);
             
             // 1. Fetch existing history for sidebar
+            // Changed: Fetch ALL sessions and filter client-side. 
+            // Previous logic only fetched titles containing 'Voice', so renamed chats disappeared.
             const { data } = await supabase
                 .from('chat_sessions')
                 .select('*')
                 .eq('user_id', userId)
-                .ilike('title', '%Voice%')
                 .order('created_at', { ascending: false });
             
-            const sessions = data || [];
+            const allSessions = data || [];
+            
+            // Filter: Include if title says "Voice" OR if the metadata indicates it's a voice chat
+            const sessions = allSessions.filter((s: any) => 
+                s.title?.toLowerCase().includes('voice') || 
+                s.messages?.[0]?.meta?.type === 'voice'
+            );
+            
             setVoiceSessions(sessions);
 
             // 2. Determine Start State
             let targetSession = null;
 
             if (initialSessionId) {
-                targetSession = sessions.find(s => s.id === initialSessionId);
+                targetSession = sessions.find((s: any) => s.id === initialSessionId);
                 if (!targetSession) {
-                     // Try direct fetch if not in list
+                     // Try direct fetch if not in list (edge case)
                      const { data: direct } = await supabase.from('chat_sessions').select('*').eq('id', initialSessionId).single();
                      if (direct) targetSession = direct;
                 }
@@ -133,7 +142,7 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ userProfile, userId, initialSessi
     const startListening = () => {
         const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
         if (!SpeechRecognition) {
-            alert("Voice recognition not supported in this browser. Try Chrome.");
+            showToast("Voice recognition not supported in this browser. Try Chrome.", 'error');
             return;
         }
 
@@ -257,13 +266,24 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ userProfile, userId, initialSessi
             });
         }
 
-        // 4. AI Request (Sliding Window Context)
+        // 4. AI Request (Unlimited Context, removed slicing)
+        
+        // --- FETCH LIVE STATS ---
+        let liveStats = undefined;
+        if (userId) {
+            liveStats = await fetchLiveUserStats(userId);
+        }
+        
+        const fullContext = {
+            ...userProfile,
+            stats: liveStats
+        };
+
         const previousContext = historyWithUser
             .slice(0, -1)
-            .slice(-20) 
             .map(m => ({ role: m.role, text: m.text }));
 
-        const aiText = await chatWithAIVoice(text, previousContext, userProfile);
+        const aiText = await chatWithAIVoice(text, previousContext, fullContext);
 
         // 5. Local Update (AI)
         const aiMsg: ChatMessage = {
@@ -281,16 +301,24 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ userProfile, userId, initialSessi
 
         // 7. Speak
         setStatus('SPEAKING');
-        speechManager.speak(aiText, 
-            () => {}, 
-            () => {
+        
+        // Use the best female voice available
+        const femaleVoice = speechManager.getFemaleVoice();
+        
+        speechManager.speak(aiText, {
+            voice: femaleVoice,
+            // Pitch 1.05 gives it a slightly friendlier, younger tone without sounding chipmunk-like
+            // Rate 1.05 keeps the conversation flowing naturally
+            pitch: 1.05,
+            rate: 1.05,
+            onEnd: () => {
                 if (autoModeRef.current) {
                     startListening();
                 } else {
                     setStatus('IDLE');
                 }
             }
-        );
+        });
     };
 
     const handleOrbClick = () => {

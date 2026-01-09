@@ -50,7 +50,7 @@ const callGroqAPI = async (
             model: GROQ_MODEL,
             messages: messages,
             temperature: temperature,
-            max_tokens: 4096 // Increased for larger payloads
+            max_tokens: 8096 // Increased for Research payload
         };
 
         if (jsonMode) {
@@ -140,47 +140,134 @@ CRITICAL VOICE RULES:
 
 // --- FEATURES ---
 
-export const analyzeUserProfile = async (sessions: ChatSession[]) => {
-    if (!sessions || sessions.length === 0) return { name: null, interests: "General Science, Basics" };
+export interface LiveUserContext {
+    name?: string | null;
+    interests?: string;
+    stats?: {
+        rank: string | number;
+        totalPoints: number;
+        totalStudents: number;
+        recentQuizScores: { topic: string, score: number }[];
+        researchTopics: string[];
+        savedPodTopics: string[];
+        communityNotesCount: number;
+    };
+}
 
+// Aggregates user activity from multiple tables for real-time context
+export const fetchLiveUserStats = async (userId: string) => {
     try {
-        const userMessages = sessions.flatMap(s => s.messages)
+        const [userRes, quizRes, researchRes, libraryRes, notesRes, allUsersRes] = await Promise.all([
+            supabase.from('users').select('total_points').eq('id', userId).single(),
+            supabase.from('quiz_progress').select('topic, score').eq('user_id', userId).order('updated_at', {ascending: false}).limit(3),
+            supabase.from('research_projects').select('title').eq('user_id', userId).order('created_at', {ascending: false}).limit(3),
+            supabase.from('study_library').select('topic').eq('user_id', userId).order('created_at', {ascending: false}).limit(3),
+            supabase.from('community_notes').select('id', { count: 'exact' }).eq('user_id', userId),
+            supabase.from('users').select('id, total_points').order('total_points', { ascending: false })
+        ]);
+
+        let rank = '-';
+        let totalStudents = 0;
+        if (allUsersRes.data) {
+            totalStudents = allUsersRes.data.length;
+            const idx = allUsersRes.data.findIndex(u => u.id === userId);
+            if (idx !== -1) rank = (idx + 1).toString();
+        }
+
+        return {
+            rank,
+            totalPoints: userRes.data?.total_points || 0,
+            totalStudents,
+            recentQuizScores: quizRes.data || [],
+            researchTopics: researchRes.data?.map(r => r.title) || [],
+            savedPodTopics: libraryRes.data?.map(l => l.topic) || [],
+            communityNotesCount: notesRes.count || 0
+        };
+    } catch (e) {
+        console.error("Error fetching live stats", e);
+        return undefined;
+    }
+};
+
+interface AnalysisData {
+    sessions: ChatSession[];
+    rank: string | number;
+    totalPoints: number;
+    totalStudents?: number;
+    recentQuizScores: { topic: string, score: number }[];
+    researchTopics: string[];
+    savedPodTopics: string[];
+}
+
+export const analyzeUserProfile = async (data: AnalysisData) => {
+    try {
+        // Construct rich context
+        const chatContext = data.sessions.flatMap(s => s.messages)
             .filter(m => m.role === 'user')
-            .slice(-20)
+            .slice(-15) // Recent 15 messages
             .map(m => m.text)
             .join('\n');
 
-        if (!userMessages) return { name: null, interests: "General Science" };
+        // Only proceed if there is SOME activity
+        const hasActivity = chatContext || data.recentQuizScores.length > 0 || data.researchTopics.length > 0 || data.savedPodTopics.length > 0;
+        
+        if (!hasActivity) return { name: null, interests: "General Science, Basics" };
+
+        const systemPrompt = `You are an AI Analyst for an educational app. Return JSON only.`;
+        
+        const userPrompt = `Analyze this Class 8 student's ENTIRE digital footprint to build a personalization profile.
+        
+        DATA FOOTPRINT:
+        - Global Rank: #${data.rank} out of ${data.totalStudents || '?'} students (XP: ${data.totalPoints})
+        - Recent Quiz Scores: ${JSON.stringify(data.recentQuizScores)}
+        - Research Projects Created: ${data.researchTopics.join(', ') || 'None'}
+        - Saved Study Pods: ${data.savedPodTopics.join(', ') || 'None'}
+        - Recent Chat Messages:
+        ${chatContext}
+
+        GOAL: Return a concise "interests" string that describes:
+        1. Their specific hobbies (e.g. "Loves Minecraft").
+        2. Their learning style based on data (e.g. "High rank but low research means they prefer quizzes", "Visual learner", "Struggles with Physics").
+        3. Their name (if mentioned in chat).
+
+        Respond ONLY with a JSON object:
+        { "name": "Rohan", "interests": "Loves cricket analogies, top scorer in Biology but avoids Physics, enjoys visual study pods." }`;
 
         const responseText = await callGroqAPI([
-            { role: "system", content: "You are an analyzer bot. Return JSON only." },
-            { role: "user", content: `Analyze these chat messages from a Class 8 student to build a personalization profile.
-            
-            GOAL: Return a concise "interests" string that describes:
-            1. Their specific hobbies (e.g., "Loves Minecraft", "Plays Football").
-            2. Their learning struggle/style (e.g., "Hates formulas", "Needs visual examples").
-            3. Their name (if mentioned).
-
-            Respond ONLY with a JSON object in this format:
-            { "name": "Rohan", "interests": "Loves cricket analogies, struggles with chemical equations, visual learner." }
-            
-            Messages:
-            ${userMessages}` }
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt }
         ], true);
 
-        const data = cleanAndParseJSON(responseText);
-        return data || { name: null, interests: "General Science" };
+        const parsed = cleanAndParseJSON(responseText);
+        return parsed || { name: null, interests: "General Science" };
     } catch (e) {
         console.error("Profile analysis failed", e);
         return { name: null, interests: "General Science" };
     }
 };
 
-export const chatWithAI = async (message: string, history: {role: 'user' | 'model', text: string}[], userContext: { name?: string | null, interests?: string }) => {
+export const chatWithAI = async (message: string, history: {role: 'user' | 'model', text: string}[], userContext: LiveUserContext) => {
   let systemInstruction = CLASS_8_SYSTEM_PROMPT;
   const name = userContext.name || "Student";
   const interests = userContext.interests || "General Science";
-  systemInstruction += `\n\nCURRENT STUDENT PROFILE:\n- Name: ${name}\n- Interests/Context: ${interests}\n\nINSTRUCTION: Adapt your language and analogies specifically for ${name} who likes ${interests}.`;
+  
+  systemInstruction += `\n\nCURRENT STUDENT PROFILE:\n- Name: ${name}\n- Interests/Context: ${interests}`;
+
+  if (userContext.stats) {
+      systemInstruction += `\n\nLIVE DASHBOARD DATA (Real-time):
+      - Global Rank: #${userContext.stats.rank} (out of ${userContext.stats.totalStudents} students)
+      - Total XP: ${userContext.stats.totalPoints}
+      - Recent Quizzes: ${JSON.stringify(userContext.stats.recentQuizScores)}
+      - Recent Research: ${userContext.stats.researchTopics.join(', ') || 'None'}
+      - Saved Pods: ${userContext.stats.savedPodTopics.join(', ') || 'None'}
+      
+      INSTRUCTION: Use this live data to personalize. 
+      - If they have high XP, praise them as a pro. 
+      - If they failed a recent quiz, offer help on that specific topic. 
+      - Mention their research topics if relevant.`;
+  }
+  
+  systemInstruction += `\n\nINSTRUCTION: Adapt your language and analogies specifically for ${name} who likes ${interests}.`;
 
   const messages = [
       { role: "system", content: systemInstruction },
@@ -192,11 +279,20 @@ export const chatWithAI = async (message: string, history: {role: 'user' | 'mode
   return response || "My brain is buffering... can you try asking that again? 🧠";
 };
 
-export const chatWithAIVoice = async (message: string, history: {role: 'user' | 'model', text: string}[], userContext: { name?: string | null, interests?: string }) => {
+export const chatWithAIVoice = async (message: string, history: {role: 'user' | 'model', text: string}[], userContext: LiveUserContext) => {
   let systemInstruction = VOICE_SYSTEM_PROMPT;
   const name = userContext.name || "Friend";
   const interests = userContext.interests || "Science";
+  
   systemInstruction += `\n\nUSER PROFILE:\n- Name: ${name}\n- Interests: ${interests}`;
+
+  if (userContext.stats) {
+    systemInstruction += `\n\nLIVE DATA:
+    - Rank: #${userContext.stats.rank} / ${userContext.stats.totalStudents} (XP: ${userContext.stats.totalPoints})
+    - Quizzes: ${JSON.stringify(userContext.stats.recentQuizScores)}
+    
+    INSTRUCTION: If they ask about their performance, use this data. If they struggled on a quiz, encourage them.`;
+  }
 
   const messages = [
       { role: "system", content: systemInstruction },
@@ -276,8 +372,6 @@ export const generateQuizQuestions = async (topic: string, count: number = 5, in
         ]
     }`;
 
-    // For 30 questions, we might hit token limits if we ask for too much verbose detail
-    // We increase max_tokens in callGroqAPI for this.
     const response = await callGroqAPI([{ role: "user", content: prompt }], true);
     const data = cleanAndParseJSON(response);
     return data?.questions || [];
@@ -370,28 +464,147 @@ export const generateMatchingPairs = async (topic: string): Promise<MatchingPair
     return data?.pairs || [];
 };
 
-export const generatePerformanceReport = async (userName: string, stats: any) => {
+export const generatePerformanceReport = async (userName: string, interests: string, stats: any) => {
     const prompt = `
-    You are a Senior Academic Advisor for Class 8 Science. Analyze this student's performance data.
-
-    STUDENT: ${userName}
+    You are a Senior Academic Advisor for Class 8 Science. 
+    You have analyzed the student's ENTIRE digital footprint on the app.
     
-    DATA:
-    - Total XP: ${stats.totalPoints}
-    - Global Rank: #${stats.rank}
-    - Quiz Activity: ${stats.quizzesAttempted} quizzes taken.
-    - Topic Mastery: ${JSON.stringify(stats.topicScores)}
-    - Chat Engagement: ${stats.totalChats} sessions (${stats.voiceChats} voice).
+    STUDENT: ${userName}
+    INTERESTS: ${interests}
+    
+    DATA ANALYSIS:
+    1. **Rank & XP**: Global Rank #${stats.rank} with ${stats.totalPoints} XP.
+    2. **Quiz Mastery**: 
+       ${JSON.stringify(stats.topicScores)}
+    3. **Research Lab Activity**: 
+       ${stats.researchProjects && stats.researchProjects.length > 0 ? `Created ${stats.researchProjects.length} projects: ${stats.researchProjects.map((r:any) => r.title).join(', ')}` : "No research projects yet."}
+    4. **Study Pod Library**: 
+       ${stats.savedPods && stats.savedPods.length > 0 ? `Saved ${stats.savedPods.length} items (${stats.savedPods.map((s:any) => s.topic).join(', ')}).` : "Library is empty."}
+    5. **Community Contribution**: 
+       ${stats.communityNotes && stats.communityNotes > 0 ? `Shared ${stats.communityNotes} notes with the community.` : "Has not contributed to community yet."}
+    6. **Chat Engagement**: ${stats.totalChats} sessions (${stats.voiceChats} voice).
 
     TASK:
-    Write a brief, personalized performance review (approx 150 words).
-    Structure:
-    1. **Overall Progress**: A general assessment.
-    2. **Strengths 🌟**: What are they doing well?
-    3. **Focus Areas 🎯**: Which topics need more work? (Look at low scores).
-    4. **Action Plan**: One specific suggestion (e.g. "Try the Study Pod for 'Force and Pressure'").
+    Write a hyper-personalized, holistic performance review (approx 200 words).
+    - **Connect the dots**: e.g., "I see you researched Black Holes but haven't taken the Light quiz yet." or "You love saving Podcasts about Biology."
+    - **Structure**:
+      1. **Holistic Overview**: How are they using the app overall?
+      2. **Deep Dive 🧠**: Analyze their research/study habits vs their quiz scores.
+      3. **Strengths 🌟**: What are they best at?
+      4. **Next Steps 🚀**: Specific advice based on what they *haven't* done yet.
 
-    Use Markdown. Be encouraging but analytical.
+    Use Markdown. Be encouraging but highly analytical.
     `;
     return callGroqAPI([{role: 'user', content: prompt}], false);
+};
+
+// --- RESEARCH MODE FUNCTIONS ---
+
+export const generateResearchTitle = async (text: string): Promise<string> => {
+    // Truncate text if too long to save tokens
+    const sample = text.slice(0, 2000);
+    const prompt = `Read the following text content and give it a short, catchy scientific title (3-6 words). Do NOT use quotes.
+    Content: ${sample}`;
+    
+    const response = await callGroqAPI([{ role: "user", content: prompt }]);
+    return response?.trim().replace(/^"|"$/g, '') || "Untitled Research";
+};
+
+export const generateSummaryFromText = async (text: string): Promise<string> => {
+    const sample = text.slice(0, 15000); // Larger window for research
+    const prompt = `Summarize the following research text into a clear, structured note for a Class 8 student.
+    Use headings, bullet points, and **bold** text. Make it easy to revise.
+    
+    Text: ${sample}`;
+    
+    const response = await callGroqAPI([{ role: "user", content: prompt }]);
+    return response || "Could not generate summary.";
+};
+
+export const generateQuizFromText = async (text: string): Promise<QuizQuestion[]> => {
+    const sample = text.slice(0, 8000);
+    const prompt = `Based strictly on the provided text, generate 5 multiple choice questions for a Class 8 student.
+    Return ONLY a JSON object with this structure:
+    {
+        "questions": [
+            {
+                "question": "...",
+                "options": ["A", "B", "C", "D"],
+                "correctAnswer": "Exact Option Text",
+                "explanation": "Why?"
+            }
+        ]
+    }
+    
+    Text: ${sample}`;
+    
+    const response = await callGroqAPI([{ role: "user", content: prompt }], true);
+    const data = cleanAndParseJSON(response);
+    return data?.questions || [];
+};
+
+export const generateInfographicFromText = async (text: string): Promise<{root: any, children: any[]}> => {
+    const sample = text.slice(0, 5000);
+    const prompt = `Analyze this text and create a concept map structure.
+    Return ONLY a JSON object:
+    {
+        "root": { "label": "Main Concept", "description": "Short summary" },
+        "children": [
+            { "label": "Subconcept 1", "description": "Connection details" },
+            { "label": "Subconcept 2", "description": "Connection details" },
+            ... (Max 6 children)
+        ]
+    }
+    
+    Text: ${sample}`;
+    
+    const response = await callGroqAPI([{ role: "user", content: prompt }], true);
+    return cleanAndParseJSON(response);
+};
+
+export const generatePodcastScriptFromText = async (text: string): Promise<PodcastSegment[]> => {
+    const sample = text.slice(0, 8000);
+    const prompt = `Create a 2-person podcast script discussing the following text.
+    Host 1 (Ms. Rachel): Expert.
+    Host 2 (Rohan): Curious Student.
+    Make it engaging and educational. Length: ~10 exchanges.
+    
+    Return JSON:
+    {
+        "script": [
+            { "speaker": "Host 1", "text": "..." },
+            ...
+        ]
+    }
+    
+    Text: ${sample}`;
+    
+    const response = await callGroqAPI([{ role: "user", content: prompt }], true);
+    const data = cleanAndParseJSON(response);
+    return data?.script || [];
+};
+
+export const chatWithResearchDocument = async (
+    question: string, 
+    history: {role: 'user' | 'model', text: string}[], 
+    documentText: string
+) => {
+    // Truncate doc text to avoid token limits (approx 40k chars is safe for Llama 3 on Groq usually)
+    const context = documentText.slice(0, 40000); 
+    
+    const systemPrompt = `You are a research assistant. 
+    You have been provided with a document text. 
+    Answer the user's question STRICTLY based on the provided document context below.
+    If the answer is not in the document, say "I cannot find that information in the document."
+    
+    DOCUMENT CONTEXT:
+    ${context}`;
+
+    const messages = [
+        { role: "system", content: systemPrompt },
+        ...history.map(h => ({ role: h.role === 'model' ? "assistant" : "user", content: h.text })),
+        { role: "user", content: question }
+    ];
+
+    return await callGroqAPI(messages, false);
 };

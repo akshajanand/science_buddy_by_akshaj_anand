@@ -3,6 +3,7 @@ import { supabase } from '../services/supabaseClient';
 import { generateQuizQuestions } from '../services/aiService';
 import { QuizQuestion } from '../types';
 import { Loader2, CheckCircle, XCircle, ArrowLeft, Trophy, ArrowRight } from 'lucide-react';
+import { showToast } from '../utils/notificationUtils';
 
 interface TopicQuizProps {
     userId: string;
@@ -72,7 +73,7 @@ const TopicQuiz: React.FC<TopicQuizProps> = ({ userId, topic, userInterests, onB
             
             if (error) {
                 console.error("Error saving quiz", error);
-                alert("Failed to save quiz progress.");
+                showToast("Failed to save quiz progress.", 'error');
             }
 
             setQuestions(newQuestions);
@@ -80,7 +81,7 @@ const TopicQuiz: React.FC<TopicQuizProps> = ({ userId, topic, userInterests, onB
             setScore(0);
             setIsComplete(false);
         } else {
-            alert("Failed to generate questions. Please check your connection and try again.");
+            showToast("Failed to generate questions. Please try again.", 'error');
             onBack();
         }
         setGenerating(false);

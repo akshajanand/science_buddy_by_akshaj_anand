@@ -13,6 +13,8 @@ export enum AppView {
   STUDY_POD = 'STUDY_POD',
   CONCEPT_MAP = 'CONCEPT_MAP',
   STYLE_SWAPPER = 'STYLE_SWAPPER',
+  RESEARCH = 'RESEARCH',
+  COMMUNITY = 'COMMUNITY', // New Feature
 }
 
 export interface ChatSession {
@@ -88,4 +90,36 @@ export interface MatchCard {
 export interface PodcastSegment {
     speaker: 'Host 1' | 'Host 2';
     text: string;
+}
+
+export interface StudyItem {
+    id: string;
+    user_id: string;
+    topic: string;
+    type: 'SUMMARY' | 'PODCAST';
+    content: any; // string for summary, PodcastSegment[] for podcast
+    created_at: string;
+}
+
+export interface ResearchProject {
+    id: string;
+    user_id: string;
+    title: string;
+    source_text: string;
+    summary?: string;
+    quiz_data?: QuizQuestion[];
+    infographic_data?: {root: any, children: any[]};
+    podcast_script?: PodcastSegment[];
+    chat_history?: ChatMessage[];
+    created_at: string;
+}
+
+export interface CommunityNote {
+    id: string;
+    user_id: string;
+    username: string;
+    title: string;
+    content: string;
+    file_type: string;
+    created_at: string;
 }

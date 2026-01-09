@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { Atom, LogIn, UserPlus, Loader2, AlertCircle } from 'lucide-react';
+import { showToast } from '../utils/notificationUtils';
 
 interface AuthProps {
     onLogin: (user: any) => void;
@@ -9,7 +10,6 @@ interface AuthProps {
 export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [parentEmail, setParentEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +33,7 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
             throw new Error('Invalid username or password');
         }
         
+        showToast(`Welcome back, ${data.username}!`, 'success');
         onLogin(data);
       } else {
         // Direct table insert for Signup
@@ -52,19 +53,19 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
             .insert([{ 
                 username, 
                 password, 
-                interests: '',
-                parent_email: parentEmail.trim() || null 
+                interests: ''
             }])
             .select()
             .single();
 
         if (error) throw error;
         
-        alert('Signup successful! Logging you in...');
+        showToast('Signup successful! Logging you in...', 'success');
         onLogin(data);
       }
     } catch (err: any) {
       setError(err.message || 'An error occurred');
+      showToast(err.message || 'Authentication failed', 'error');
     } finally {
       setLoading(false);
     }
@@ -121,20 +122,6 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
                     placeholder="••••••••"
                 />
             </div>
-
-            {!isLogin && (
-                <div className="animate-in fade-in slide-in-from-top-4">
-                    <label className="block text-xs font-bold text-white/60 mb-1 ml-1 uppercase">Parent Email <span className="text-white/30 lowercase font-normal">(optional)</span></label>
-                    <input
-                        type="email"
-                        value={parentEmail}
-                        onChange={(e) => setParentEmail(e.target.value)}
-                        className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-cyan-400/50 focus:bg-black/40 transition-all"
-                        placeholder="parent@example.com"
-                    />
-                    <p className="text-[10px] text-white/40 mt-1 ml-1">We can send them your weekly progress reports!</p>
-                </div>
-            )}
 
             <button
                 type="submit"

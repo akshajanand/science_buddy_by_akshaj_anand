@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, Plus, MessageSquare, Trash2, Bot, User, Settings, X, Save, History, Sparkles } from 'lucide-react';
 import { ChatSession, ChatMessage } from '../types';
-import { chatWithAI, generateTitle } from '../services/aiService';
+import { chatWithAI, generateTitle, fetchLiveUserStats } from '../services/aiService';
 import { supabase } from '../services/supabaseClient';
 import { renderRichText } from '../utils/textUtils';
 
@@ -160,11 +160,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userProfile, onUpdateProf
         });
         
         const currentSession = updatedSessions.find(s => s.id === targetSessionId);
-        // Sliding window logic (last 30 messages)
+        // Sliding window logic (Unlimited context now, removed slice)
         if (currentSession && currentSession.messages.length > 1) {
              previousContext = currentSession.messages
                 .slice(0, -1) // Exclude current message
-                .slice(-30)   // Sliding window
                 .map(m => ({ role: m.role, text: m.text }));
         } else {
             previousContext = [];
@@ -174,8 +173,19 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userProfile, onUpdateProf
     setSessions(updatedSessions);
 
     // --- AI GENERATION ---
+    
+    // Fetch live stats just before sending
+    let liveStats = undefined;
+    if (userId) {
+        liveStats = await fetchLiveUserStats(userId);
+    }
 
-    const responseText = await chatWithAI(userText, previousContext, userProfile);
+    const fullContext = {
+        ...userProfile,
+        stats: liveStats
+    };
+
+    const responseText = await chatWithAI(userText, previousContext, fullContext);
 
     const botMsg: ChatMessage = {
       id: (Date.now() + 1).toString(),
@@ -398,7 +408,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userProfile, onUpdateProf
         </div>
 
         {/* Input Bar */}
-        <div className="p-4 bg-black/20 backdrop-blur-md border-t border-white/10">
+        <div className="p-4 pb-6 md:pb-4 bg-black/20 backdrop-blur-md border-t border-white/10">
         <div className="relative max-w-4xl mx-auto flex gap-2 items-center">
             
             <div className="flex-1 relative">
@@ -408,14 +418,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userProfile, onUpdateProf
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                 placeholder={userProfile.name ? `Ask me anything, ${userProfile.name}...` : "Ask about science..."}
-                className="w-full bg-white/10 border border-white/20 rounded-xl py-4 pl-4 pr-12 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-purple-400/50 transition-all text-sm md:text-base shadow-inner"
+                className="w-full bg-white/10 border border-white/20 rounded-xl py-4 pl-4 pr-12 text-white placeholder-white/50 focus:outline-none focus:border-cyan-400/50 transition-all text-sm md:text-base shadow-inner"
                 />
             </div>
 
             <button 
             onClick={handleSend}
             disabled={loading || !input.trim()}
-            className="p-4 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl transition-all hover:shadow-lg disabled:opacity-30 disabled:shadow-none text-white"
+            className="p-4 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl transition-all hover:shadow-lg disabled:opacity-30 disabled:shadow-none text-white active:scale-95"
             >
             <Send size={20} />
             </button>

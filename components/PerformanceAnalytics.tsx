@@ -2,8 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { generatePerformanceReport } from '../services/aiService';
 import { renderRichText } from '../utils/textUtils';
-import { BarChart2, TrendingUp, Target, Award, Brain, Zap, Loader2, Mail, Check, AlertTriangle, Plus, Save, X } from 'lucide-react';
-import emailjs from '@emailjs/browser';
+import { BarChart2, TrendingUp, Target, Award, Brain, Zap, Loader2, FileText, Headphones, Users } from 'lucide-react';
 
 interface PerformanceAnalyticsProps {
     userId: string;
@@ -16,15 +15,7 @@ const PerformanceAnalytics: React.FC<PerformanceAnalyticsProps> = ({ userId, use
     const [loading, setLoading] = useState(true);
     const [analysis, setAnalysis] = useState<string | null>(null);
     const [analyzing, setAnalyzing] = useState(false);
-    
-    // Email Sending State
-    const [sendingEmail, setSendingEmail] = useState(false);
-    const [emailStatus, setEmailStatus] = useState<'IDLE' | 'SUCCESS' | 'ERROR'>('IDLE');
-    const [parentEmail, setParentEmail] = useState<string | null>(null);
-    
-    // Email Management State
-    const [isAddingEmail, setIsAddingEmail] = useState(false);
-    const [tempEmail, setTempEmail] = useState('');
+    const [userInterests, setUserInterests] = useState('');
 
     useEffect(() => {
         fetchStats();
@@ -33,156 +24,64 @@ const PerformanceAnalytics: React.FC<PerformanceAnalyticsProps> = ({ userId, use
     const fetchStats = async () => {
         setLoading(true);
 
-        // 1. Fetch Rank (All Time)
-        const { data: usersData } = await supabase
-            .from('users')
-            .select('id, total_points, parent_email')
-            .order('total_points', { ascending: false });
+        // Parallel Fetching for holistic view
+        const [usersData, quizData, chatData, researchData, libraryData, notesData, userProfile] = await Promise.all([
+            supabase.from('users').select('id, total_points').order('total_points', { ascending: false }),
+            supabase.from('quiz_progress').select('*').eq('user_id', userId),
+            supabase.from('chat_sessions').select('id, title, messages').eq('user_id', userId),
+            supabase.from('research_projects').select('title, created_at').eq('user_id', userId),
+            supabase.from('study_library').select('topic, type').eq('user_id', userId),
+            supabase.from('community_notes').select('id').eq('user_id', userId),
+            supabase.from('users').select('interests').eq('id', userId).single()
+        ]);
 
+        // 1. Process Rank
         let rank = '-';
-        
-        if (usersData) {
-            const userRecord = usersData.find(u => u.id === userId);
-            if (userRecord) {
-                setParentEmail(userRecord.parent_email);
-                const index = usersData.findIndex(u => u.id === userId);
-                if (index !== -1) {
-                    rank = (index + 1).toString();
-                }
+        if (usersData.data) {
+            const index = usersData.data.findIndex(u => u.id === userId);
+            if (index !== -1) {
+                rank = (index + 1).toString();
             }
         }
 
-        // 2. Fetch Quiz Progress
-        const { data: quizData } = await supabase
-            .from('quiz_progress')
-            .select('*')
-            .eq('user_id', userId);
-        
-        const quizzesAttempted = quizData ? quizData.length : 0;
-        const topicScores = quizData ? quizData.map(q => ({
+        // 2. Process Quiz Progress
+        const quizzesAttempted = quizData.data ? quizData.data.length : 0;
+        const topicScores = quizData.data ? quizData.data.map((q: any) => ({
             topic: q.topic,
             score: q.score,
             total: 60, // Assuming 30 questions * 2 points
             percent: Math.round((q.score / 60) * 100)
         })) : [];
 
-        // 3. Fetch Chat Engagement
-        const { data: chatData } = await supabase
-            .from('chat_sessions')
-            .select('id, title, messages')
-            .eq('user_id', userId);
-            
-        const totalChats = chatData ? chatData.length : 0;
-        const voiceChats = chatData ? chatData.filter(c => c.title.toLowerCase().includes('voice')).length : 0;
+        // 3. Process Chat
+        const totalChats = chatData.data ? chatData.data.length : 0;
+        const voiceChats = chatData.data ? chatData.data.filter((c: any) => c.title.toLowerCase().includes('voice')).length : 0;
+
+        // 4. Set Profile Interests
+        if (userProfile.data) {
+            setUserInterests(userProfile.data.interests || "General Science");
+        }
 
         setStats({
             rank,
             quizzesAttempted,
             topicScores,
             totalChats,
-            voiceChats
+            voiceChats,
+            researchProjects: researchData.data || [],
+            savedPods: libraryData.data || [],
+            communityNotes: notesData.data ? notesData.data.length : 0,
+            totalPoints: currentUserPoints
         });
         setLoading(false);
-    };
-
-    const handleSaveEmail = async () => {
-        if (!tempEmail.includes('@')) {
-            alert("Please enter a valid email.");
-            return;
-        }
-        
-        const { error } = await supabase
-            .from('users')
-            .update({ parent_email: tempEmail })
-            .eq('id', userId);
-
-        if (error) {
-            alert("Error saving email");
-        } else {
-            setParentEmail(tempEmail);
-            setIsAddingEmail(false);
-        }
     };
 
     const handleGenerateAnalysis = async () => {
         if (!stats) return;
         setAnalyzing(true);
-        const report = await generatePerformanceReport(username, { ...stats, totalPoints: currentUserPoints });
+        const report = await generatePerformanceReport(username, userInterests, stats);
         setAnalysis(report);
         setAnalyzing(false);
-    };
-
-    const stripMarkdown = (text: string) => {
-        if (!text) return "";
-        return text
-            .replace(/\*\*(.*?)\*\*/g, '$1') // Bold
-            .replace(/\*(.*?)\*/g, '$1')     // Italic
-            .replace(/#{1,6}\s?/g, '')       // Headers
-            .replace(/`/g, '')               // Code
-            .replace(/\[(.*?)\]\(.*?\)/g, '$1'); // Links
-    };
-
-    const handleSendReport = async () => {
-        if (!parentEmail || !stats) return;
-        setSendingEmail(true);
-        setEmailStatus('IDLE');
-
-        try {
-            // 1. Generate report content if needed
-            const reportContent = analysis || await generatePerformanceReport(username, { ...stats, totalPoints: currentUserPoints });
-            if (!analysis) setAnalysis(reportContent);
-
-            // ---------------------------------------------------------------------------
-            // FRONTEND EMAIL CONFIGURATION (EmailJS)
-            // Configured with user keys
-            // ---------------------------------------------------------------------------
-            const SERVICE_ID: string = 'service_4rd3ex6'; 
-            const TEMPLATE_ID: string = 'template_ld5md57';
-            const PUBLIC_KEY: string = 'X1eYkPAczlxtDVjnw';
-            // ---------------------------------------------------------------------------
-
-            if (SERVICE_ID === 'YOUR_SERVICE_ID_HERE') {
-                // FALLBACK: If keys are not configured, use "mailto" to open local email client.
-                // This ensures the button works immediately without crashing.
-                console.log("EmailJS not configured. Falling back to Mailto.");
-                
-                const cleanReport = stripMarkdown(reportContent);
-                const subject = encodeURIComponent(`Science Buddy Progress: ${username}`);
-                const body = encodeURIComponent(
-                    `Dear Parent,\n\nHere is the latest progress report for ${username}.\n\n` +
-                    `-- QUICK STATS --\n` +
-                    `Global Rank: #${stats.rank}\n` +
-                    `Total XP: ${currentUserPoints}\n` +
-                    `Quizzes Taken: ${stats.quizzesAttempted}\n\n` +
-                    `-- AI TUTOR ANALYSIS --\n` +
-                    `${cleanReport}\n\n` +
-                    `Generated by Science Buddy.`
-                );
-
-                // Small delay to simulate processing so the user sees the spinner
-                await new Promise(resolve => setTimeout(resolve, 1500));
-                
-                window.location.href = `mailto:${parentEmail}?subject=${subject}&body=${body}`;
-                setEmailStatus('SUCCESS');
-            } else {
-                // PRIMARY: Send using EmailJS API
-                await emailjs.send(SERVICE_ID, TEMPLATE_ID, {
-                    to_email: parentEmail,
-                    student_name: username,
-                    message: stripMarkdown(reportContent),
-                    total_points: currentUserPoints,
-                    rank: stats.rank,
-                    quizzes: stats.quizzesAttempted
-                }, PUBLIC_KEY);
-                setEmailStatus('SUCCESS');
-            }
-
-        } catch (e) {
-            console.error("Failed to send email", e);
-            setEmailStatus('ERROR');
-        } finally {
-            setSendingEmail(false);
-        }
     };
 
     if (loading) {
@@ -196,79 +95,46 @@ const PerformanceAnalytics: React.FC<PerformanceAnalyticsProps> = ({ userId, use
                     <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-300 to-cyan-300 mb-2">
                         My Performance
                     </h2>
-                    <p className="text-white/60">Track your progress and get AI-powered insights.</p>
+                    <p className="text-white/60">Holistic view of your entire learning journey.</p>
                 </div>
-                
-                {parentEmail ? (
-                    <button 
-                        onClick={handleSendReport}
-                        disabled={sendingEmail || emailStatus === 'SUCCESS'}
-                        className={`glass-button px-4 py-2 rounded-xl flex items-center gap-2 font-bold text-sm transition-all ${emailStatus === 'SUCCESS' ? 'bg-green-500/20 text-green-300' : 'hover:bg-white/10'}`}
-                    >
-                        {sendingEmail ? <Loader2 size={16} className="animate-spin" /> : 
-                         emailStatus === 'SUCCESS' ? <Check size={16} /> : 
-                         emailStatus === 'ERROR' ? <AlertTriangle size={16} className="text-red-400"/> :
-                         <Mail size={16} />}
-                        
-                        {sendingEmail ? 'Preparing Email...' : 
-                         emailStatus === 'SUCCESS' ? 'Email Opened!' : 
-                         emailStatus === 'ERROR' ? 'Retry Sending' :
-                         'Email Report to Parent'}
-                    </button>
-                ) : (
-                    // Logic for adding email if missing
-                    isAddingEmail ? (
-                        <div className="flex gap-2 animate-in fade-in slide-in-from-right-4">
-                            <input 
-                                value={tempEmail}
-                                onChange={(e) => setTempEmail(e.target.value)}
-                                placeholder="parent@email.com"
-                                className="bg-black/20 border border-white/20 rounded-xl px-3 py-2 text-sm text-white focus:border-cyan-400 outline-none w-48"
-                            />
-                            <button onClick={handleSaveEmail} className="glass-button p-2 rounded-xl bg-green-500/20 text-green-300 hover:bg-green-500/30"><Save size={18} /></button>
-                            <button onClick={() => setIsAddingEmail(false)} className="glass-button p-2 rounded-xl hover:bg-red-500/20 hover:text-red-300"><X size={18} /></button>
-                        </div>
-                    ) : (
-                        <button 
-                            onClick={() => setIsAddingEmail(true)}
-                            className="glass-button px-4 py-2 rounded-xl flex items-center gap-2 font-bold text-sm hover:bg-white/10 text-white/70"
-                        >
-                            <Plus size={16} /> Connect Parent Email
-                        </button>
-                    )
-                )}
             </div>
 
             {/* Top Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div className="glass-panel p-6 rounded-2xl flex items-center gap-4 bg-gradient-to-br from-yellow-900/40 to-black/20">
-                    <div className="p-4 rounded-full bg-yellow-500/20 text-yellow-300">
-                        <Award size={32} />
-                    </div>
-                    <div>
-                        <div className="text-3xl font-bold">#{stats.rank}</div>
-                        <div className="text-xs text-white/50 uppercase tracking-wider">Global Rank</div>
-                    </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+                <div className="glass-panel p-4 rounded-xl flex flex-col justify-center items-center bg-gradient-to-br from-yellow-900/40 to-black/20 text-center">
+                    <div className="text-yellow-300 mb-2"><Award size={24} /></div>
+                    <div className="text-2xl font-bold">#{stats.rank}</div>
+                    <div className="text-[10px] text-white/50 uppercase tracking-wider">Global Rank</div>
                 </div>
 
-                <div className="glass-panel p-6 rounded-2xl flex items-center gap-4 bg-gradient-to-br from-cyan-900/40 to-black/20">
-                    <div className="p-4 rounded-full bg-cyan-500/20 text-cyan-300">
-                        <Zap size={32} />
-                    </div>
-                    <div>
-                        <div className="text-3xl font-bold">{currentUserPoints}</div>
-                        <div className="text-xs text-white/50 uppercase tracking-wider">Total XP</div>
-                    </div>
+                <div className="glass-panel p-4 rounded-xl flex flex-col justify-center items-center bg-gradient-to-br from-cyan-900/40 to-black/20 text-center">
+                    <div className="text-cyan-300 mb-2"><Zap size={24} /></div>
+                    <div className="text-2xl font-bold">{currentUserPoints}</div>
+                    <div className="text-[10px] text-white/50 uppercase tracking-wider">Total XP</div>
                 </div>
 
-                <div className="glass-panel p-6 rounded-2xl flex items-center gap-4 bg-gradient-to-br from-purple-900/40 to-black/20">
-                    <div className="p-4 rounded-full bg-purple-500/20 text-purple-300">
-                        <TrendingUp size={32} />
-                    </div>
-                    <div>
-                        <div className="text-3xl font-bold">{stats.quizzesAttempted}</div>
-                        <div className="text-xs text-white/50 uppercase tracking-wider">Topics Started</div>
-                    </div>
+                <div className="glass-panel p-4 rounded-xl flex flex-col justify-center items-center bg-gradient-to-br from-purple-900/40 to-black/20 text-center">
+                    <div className="text-purple-300 mb-2"><TrendingUp size={24} /></div>
+                    <div className="text-2xl font-bold">{stats.quizzesAttempted}</div>
+                    <div className="text-[10px] text-white/50 uppercase tracking-wider">Quizzes</div>
+                </div>
+
+                <div className="glass-panel p-4 rounded-xl flex flex-col justify-center items-center bg-gradient-to-br from-blue-900/40 to-black/20 text-center">
+                    <div className="text-blue-300 mb-2"><FileText size={24} /></div>
+                    <div className="text-2xl font-bold">{stats.researchProjects.length}</div>
+                    <div className="text-[10px] text-white/50 uppercase tracking-wider">Research Docs</div>
+                </div>
+
+                <div className="glass-panel p-4 rounded-xl flex flex-col justify-center items-center bg-gradient-to-br from-orange-900/40 to-black/20 text-center">
+                    <div className="text-orange-300 mb-2"><Headphones size={24} /></div>
+                    <div className="text-2xl font-bold">{stats.savedPods.length}</div>
+                    <div className="text-[10px] text-white/50 uppercase tracking-wider">Saved Pods</div>
+                </div>
+
+                <div className="glass-panel p-4 rounded-xl flex flex-col justify-center items-center bg-gradient-to-br from-pink-900/40 to-black/20 text-center">
+                    <div className="text-pink-300 mb-2"><Users size={24} /></div>
+                    <div className="text-2xl font-bold">{stats.communityNotes}</div>
+                    <div className="text-[10px] text-white/50 uppercase tracking-wider">Contributions</div>
                 </div>
             </div>
 
@@ -309,13 +175,13 @@ const PerformanceAnalytics: React.FC<PerformanceAnalyticsProps> = ({ userId, use
                 {/* AI Analysis */}
                 <div className="flex-1 glass-panel p-6 rounded-2xl bg-gradient-to-b from-indigo-900/20 to-black/20 border border-indigo-500/20">
                     <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
-                        <Brain size={20} className="text-purple-400" /> AI Tutor Insight
+                        <Brain size={20} className="text-purple-400" /> Deep Analysis
                     </h3>
 
                     {!analysis ? (
                         <div className="text-center py-10">
                             <p className="mb-6 opacity-70">
-                                Get a personalized analysis of your learning patterns, strengths, and areas for improvement based on your activity.
+                                I will scan your Research Docs, Library, Quizzes, and Community Activity to generate a complete report.
                             </p>
                             <button 
                                 onClick={handleGenerateAnalysis}
@@ -323,7 +189,7 @@ const PerformanceAnalytics: React.FC<PerformanceAnalyticsProps> = ({ userId, use
                                 className="glass-button px-8 py-4 rounded-full font-bold bg-purple-600/30 hover:bg-purple-600/50 text-purple-100 border-purple-500/50 flex items-center justify-center gap-2 mx-auto"
                             >
                                 {analyzing ? <Loader2 className="animate-spin" /> : <Brain size={20} />}
-                                {analyzing ? 'Analyzing Data...' : 'Generate Report'}
+                                {analyzing ? 'Scanning Entire Footprint...' : 'Generate Full Report'}
                             </button>
                         </div>
                     ) : (

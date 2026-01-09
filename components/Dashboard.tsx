@@ -1,16 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { ChatSession, AppView } from '../types';
-import { Mic, MessageSquare, Book, Zap, ArrowRight, Play, Trophy, Sparkles, Search, Headphones, Puzzle, Network, PenTool, BookOpen } from 'lucide-react';
+import { Mic, MessageSquare, Book, Zap, ArrowRight, Play, Trophy, Sparkles, Search, Headphones, Puzzle, Network, PenTool, BookOpen, FileText, AlertTriangle } from 'lucide-react';
 
 interface DashboardProps {
     user: { id: string; username: string; interests: string };
     onNavigate: (view: AppView) => void;
     onResumeSession: (session: ChatSession) => void;
     onResumeTopic?: (topic: string) => void;
+    onReportIssue: () => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onResumeSession, onResumeTopic }) => {
+const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onResumeSession, onResumeTopic, onReportIssue }) => {
     const [stats, setStats] = useState({ totalChats: 0, voiceSessions: 0 });
     const [featuredActions, setFeaturedActions] = useState<any[]>([]);
     const [userRank, setUserRank] = useState<number | string>('-');
@@ -72,6 +73,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onResumeSession
         
         // Randomize Discover Actions
         const allActions = [
+            { id: AppView.RESEARCH, title: 'Research Lab', icon: FileText, color: 'text-blue-400', bg: 'from-blue-900/60', desc: 'Upload PDFs and generate summaries, quizzes, and podcasts.' },
             { id: AppView.QUIZ, title: 'Flash Quiz', icon: Zap, color: 'text-indigo-400', bg: 'from-indigo-900/60', desc: 'Test your knowledge with AI generated questions instantly.' },
             { id: AppView.VOICE_CHAT, title: 'Voice Lab', icon: Mic, color: 'text-fuchsia-400', bg: 'from-fuchsia-900/60', desc: 'Have a real conversation with Science Buddy.' },
             { id: AppView.STORY, title: 'Story Mode', icon: Book, color: 'text-emerald-400', bg: 'from-emerald-900/60', desc: 'Choose your own adventure inside a scientific concept.' },
@@ -113,14 +115,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onResumeSession
         <div className="h-full overflow-y-auto custom-scrollbar p-2 md:p-6">
             {/* Header */}
             <div className="mb-8 animate-in fade-in slide-in-from-top-4">
-                <h1 className="text-3xl md:text-5xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-cyan-300 to-purple-300">
+                <h1 className="text-2xl md:text-5xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-cyan-300 to-purple-300 leading-tight">
                     {getGreeting()}, {user.username}!
                 </h1>
-                <p className="text-white/60 text-lg">Ready to explore the universe today?</p>
+                <p className="text-white/60 text-base md:text-lg">Ready to explore the universe today?</p>
             </div>
 
-            {/* Quick Stats Row */}
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
+            {/* Quick Stats Row - Stack on Mobile, Grid on Tablet+ */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
                 <div className="glass-panel p-4 rounded-xl flex items-center gap-3 bg-gradient-to-br from-cyan-900/40 to-black/20">
                     <div className="p-3 rounded-lg bg-cyan-500/20 text-cyan-300">
                         <MessageSquare size={24} />
@@ -166,7 +168,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onResumeSession
                             <button 
                             key={topic.topic}
                             onClick={() => onResumeTopic && onResumeTopic(topic.topic)}
-                            className="glass-panel p-4 rounded-xl text-left group hover:bg-white/10 transition-all flex justify-between items-center border border-yellow-500/20 bg-gradient-to-r from-yellow-900/10 to-transparent"
+                            className="glass-panel p-4 rounded-xl text-left group hover:bg-white/10 active:scale-95 transition-all flex justify-between items-center border border-yellow-500/20 bg-gradient-to-r from-yellow-900/10 to-transparent"
                         >
                             <div className="flex items-center gap-4 overflow-hidden">
                                 <div className="p-3 rounded-full shrink-0 bg-yellow-500/20 text-yellow-300">
@@ -191,7 +193,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onResumeSession
                         <button 
                             key={session.id}
                             onClick={() => onResumeSession(session)}
-                            className="glass-panel p-4 rounded-xl text-left group hover:bg-white/10 transition-all flex justify-between items-center bg-gradient-to-r from-cyan-900/10 to-transparent"
+                            className="glass-panel p-4 rounded-xl text-left group hover:bg-white/10 active:scale-95 transition-all flex justify-between items-center bg-gradient-to-r from-cyan-900/10 to-transparent"
                         >
                             <div className="flex items-center gap-4 overflow-hidden">
                                 <div className="p-3 rounded-full shrink-0 bg-cyan-500/20 text-cyan-300">
@@ -213,7 +215,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onResumeSession
                         <button 
                             key={session.id}
                             onClick={() => onResumeSession(session)}
-                            className="glass-panel p-4 rounded-xl text-left group hover:bg-white/10 transition-all flex justify-between items-center bg-gradient-to-r from-purple-900/10 to-transparent"
+                            className="glass-panel p-4 rounded-xl text-left group hover:bg-white/10 active:scale-95 transition-all flex justify-between items-center bg-gradient-to-r from-purple-900/10 to-transparent"
                         >
                             <div className="flex items-center gap-4 overflow-hidden">
                                 <div className="p-3 rounded-full shrink-0 bg-purple-500/20 text-purple-300">
@@ -243,7 +245,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onResumeSession
                         <button 
                             key={action.id}
                             onClick={() => onNavigate(action.id)}
-                            className={`glass-panel p-6 rounded-2xl bg-gradient-to-br ${action.bg} to-black/40 hover:scale-[1.02] transition-transform text-left`}
+                            className={`glass-panel p-6 rounded-2xl bg-gradient-to-br ${action.bg} to-black/40 hover:scale-[1.02] active:scale-95 transition-all text-left`}
                         >
                             <Icon size={32} className={`${action.color} mb-4`} />
                             <h3 className="text-xl font-bold mb-2">{action.title}</h3>
@@ -251,6 +253,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onResumeSession
                         </button>
                     )
                 })}
+            </div>
+
+            <div className="mt-8 pt-8 border-t border-white/5 text-center">
+                <button 
+                    onClick={onReportIssue}
+                    className="text-xs text-white/20 hover:text-white/50 flex items-center justify-center gap-2 mx-auto transition-colors px-4 py-2 rounded-full hover:bg-white/5"
+                >
+                    <AlertTriangle size={12} /> Report a Problem
+                </button>
             </div>
         </div>
     );
