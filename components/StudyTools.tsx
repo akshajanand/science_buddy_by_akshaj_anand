@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, CheckCircle, Brain, Volume2, Search, StopCircle, Atom, Puzzle, RefreshCw, Gauge, Podcast, Radio, Trophy, Play, Pause, Download, RotateCcw, List, Save, Trash2, Library, X, Loader2, Headphones } from 'lucide-react';
+import { Mic, CheckCircle, Brain, Volume2, Search, StopCircle, Atom, Puzzle, RefreshCw, Gauge, Podcast, Radio, Trophy, Play, Pause, Download, RotateCcw, List, Save, Trash2, Library, X, Loader2, Headphones, Zap, ArrowRight, ArrowLeft, Grid } from 'lucide-react';
 import { generateQuizQuestions, generateWordPuzzle, generateStudyPodSummary, generateMatchingPairs, generatePodcastScript } from '../services/aiService';
 import { QuizQuestion, PuzzleWord, MatchCard, PodcastSegment, StudyItem } from '../types';
 import { speechManager } from '../utils/audioUtils';
@@ -59,17 +59,17 @@ export const MindMatch: React.FC = () => {
     if (!cards.length && !loading) return (
         <div className="flex flex-col items-center justify-center h-full p-6 text-center">
             <Puzzle size={64} className="mb-4 text-green-300" /><h2 className="text-3xl font-bold mb-4">Mind Match</h2>
-            <div className="relative w-full max-w-md"><input className="w-full bg-white/10 rounded-full px-6 py-4 border border-white/20" placeholder="Topic (e.g. Gravity)" value={topic} onChange={(e) => setTopic(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleStart()} /><button onClick={handleStart} className="absolute right-1 top-1 bottom-1 glass-button px-6 rounded-full active:scale-95 transition-transform">Generate</button></div>
+            <div className="relative w-full max-w-md"><input className="w-full bg-white/10 rounded-full px-6 py-4 border border-white/20 outline-none focus:border-green-400" placeholder="Topic (e.g. Gravity)" value={topic} onChange={(e) => setTopic(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleStart()} /><button onClick={handleStart} className="absolute right-2 top-2 bottom-2 glass-button px-6 rounded-full active:scale-95 transition-transform bg-green-500/20 hover:bg-green-500/40 font-bold">Start</button></div>
         </div>
     )
 
-    if (loading) return <div className="flex h-full items-center justify-center animate-pulse text-xl">Generating...</div>;
+    if (loading) return <div className="flex h-full items-center justify-center animate-pulse text-xl text-green-300"><Loader2 className="animate-spin mr-2"/> Creating Game...</div>;
 
     return (
         <div className="h-full flex flex-col p-6 overflow-hidden">
              <div className="flex justify-between items-center mb-6"><h2 className="text-2xl font-bold">{topic}</h2><button onClick={() => setCards([])}><RefreshCw/></button></div>
-             {matches === cards.length / 2 ? <div className="flex-1 flex flex-col items-center justify-center"><h1 className="text-5xl font-bold text-green-300">Done!</h1><button onClick={() => setCards([])} className="mt-4 glass-button px-6 py-3 rounded-full">Again</button></div> : 
-             <div className="flex-1 overflow-y-auto custom-scrollbar"><div className="grid grid-cols-2 md:grid-cols-4 gap-4 pb-10">{cards.map((card, idx) => <button key={idx} onClick={() => handleCardClick(card)} className={`glass-button p-4 rounded-xl min-h-[120px] flex items-center justify-center text-center transition-all active:scale-95 ${card.isMatched ? 'opacity-20 bg-green-500' : selectedCard === card ? 'bg-yellow-500/30 border-yellow-400' : errorId === card.id && selectedCard ? 'bg-red-500/30 animate-pulse' : 'bg-white/5'}`}>{card.text}</button>)}</div></div>}
+             {matches === cards.length / 2 ? <div className="flex-1 flex flex-col items-center justify-center"><h1 className="text-5xl font-bold text-green-300 animate-bounce">Done!</h1><button onClick={() => setCards([])} className="mt-4 glass-button px-6 py-3 rounded-full font-bold">Play Another</button></div> : 
+             <div className="flex-1 overflow-y-auto custom-scrollbar"><div className="grid grid-cols-2 md:grid-cols-4 gap-4 pb-10">{cards.map((card, idx) => <button key={idx} onClick={() => handleCardClick(card)} className={`glass-button p-4 rounded-xl min-h-[120px] flex items-center justify-center text-center transition-all active:scale-95 text-sm md:text-base font-medium ${card.isMatched ? 'opacity-20 bg-green-500' : selectedCard === card ? 'bg-yellow-500/30 border-yellow-400 scale-105' : errorId === card.id && selectedCard ? 'bg-red-500/30 animate-pulse border-red-500' : 'bg-white/5 hover:bg-white/10'}`}>{card.text}</button>)}</div></div>}
         </div>
     );
 };
@@ -349,5 +349,285 @@ export const StudyPod: React.FC<StudyPodProps> = ({ userId }) => {
     );
 };
 
-export const QuizModule: React.FC = () => { return <div></div> }; 
-export const WordPuzzle: React.FC = () => { return <div></div> };
+// --- Flash Quiz Component ---
+export const QuizModule: React.FC = () => { 
+    const [topic, setTopic] = useState('');
+    const [questions, setQuestions] = useState<QuizQuestion[]>([]);
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const [score, setScore] = useState(0);
+    const [loading, setLoading] = useState(false);
+    const [selectedOption, setSelectedOption] = useState<string | null>(null);
+    const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
+    const [quizComplete, setQuizComplete] = useState(false);
+
+    const startQuiz = async () => {
+        if (!topic) return;
+        setLoading(true);
+        setQuestions([]);
+        setQuizComplete(false);
+        setScore(0);
+        setCurrentIndex(0);
+        
+        try {
+            const qs = await generateQuizQuestions(topic, 5, 'General Science');
+            setQuestions(qs);
+        } catch(e) { showToast("Failed to gen quiz", 'error'); }
+        setLoading(false);
+    };
+
+    const handleAnswer = (option: string) => {
+        if (selectedOption) return;
+        setSelectedOption(option);
+        const correct = option === questions[currentIndex].correctAnswer;
+        setIsCorrect(correct);
+        if (correct) setScore(s => s + 1);
+        
+        setTimeout(() => {
+            if (currentIndex + 1 < questions.length) {
+                setCurrentIndex(p => p + 1);
+                setSelectedOption(null);
+                setIsCorrect(null);
+            } else {
+                setQuizComplete(true);
+            }
+        }, 1500);
+    };
+
+    if (quizComplete) return (
+        <div className="h-full flex flex-col items-center justify-center text-center p-6">
+            <Trophy size={64} className="text-yellow-400 mb-4" />
+            <h2 className="text-3xl font-bold mb-2">Quiz Complete!</h2>
+            <p className="text-xl mb-6">You scored {score} out of {questions.length}</p>
+            <button onClick={() => setQuestions([])} className="glass-button px-8 py-3 rounded-full font-bold">New Quiz</button>
+        </div>
+    );
+
+    if (questions.length === 0) return (
+        <div className="h-full flex flex-col items-center justify-center p-6 text-center">
+            <Zap size={64} className="mb-4 text-yellow-300" />
+            <h2 className="text-3xl font-bold mb-4">Flash Quiz</h2>
+            <p className="mb-8 opacity-60">Generate a quick 5-question test on any topic.</p>
+            <div className="relative w-full max-w-md">
+                <input className="w-full bg-white/10 rounded-full px-6 py-4 border border-white/20 outline-none focus:border-yellow-400" placeholder="Topic (e.g. Friction)" value={topic} onChange={(e) => setTopic(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && startQuiz()} />
+                <button onClick={startQuiz} disabled={loading || !topic} className="absolute right-2 top-2 bottom-2 glass-button px-6 rounded-full font-bold bg-yellow-500/20 hover:bg-yellow-500/40">{loading ? <Loader2 className="animate-spin" /> : 'Start'}</button>
+            </div>
+        </div>
+    );
+
+    const currentQ = questions[currentIndex];
+    return (
+        <div className="h-full flex flex-col p-6 max-w-3xl mx-auto w-full">
+            <div className="flex justify-between items-center mb-8">
+                <button onClick={() => setQuestions([])} className="p-2 hover:bg-white/10 rounded-full"><ArrowLeft /></button>
+                <div className="text-sm font-bold uppercase tracking-widest opacity-50">Question {currentIndex + 1}/{questions.length}</div>
+                <div className="text-yellow-300 font-bold">Score: {score}</div>
+            </div>
+            
+            <div className="glass-panel p-8 rounded-2xl mb-6 text-center text-xl font-medium min-h-[150px] flex items-center justify-center border-t-4 border-yellow-400">
+                {currentQ.question}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {currentQ.options.map((opt, i) => {
+                    let style = "glass-button p-4 rounded-xl text-left hover:bg-white/10";
+                    if (selectedOption) {
+                        if (opt === currentQ.correctAnswer) style = "bg-green-500/30 border border-green-500";
+                        else if (opt === selectedOption) style = "bg-red-500/30 border border-red-500";
+                        else style = "opacity-30";
+                    }
+                    return (
+                        <button key={i} onClick={() => handleAnswer(opt)} className={style} disabled={!!selectedOption}>
+                            <span className="opacity-50 font-bold mr-3">{String.fromCharCode(65+i)}</span> {opt}
+                        </button>
+                    )
+                })}
+            </div>
+        </div>
+    );
+};
+
+// --- Word Mine (Puzzle) Component ---
+export const WordPuzzle: React.FC = () => { 
+    const [topic, setTopic] = useState('');
+    const [words, setWords] = useState<PuzzleWord[]>([]);
+    const [grid, setGrid] = useState<string[][]>([]);
+    const [loading, setLoading] = useState(false);
+    const [selectedCells, setSelectedCells] = useState<{r:number, c:number}[]>([]);
+    const [foundCount, setFoundCount] = useState(0);
+
+    const gridSize = 10;
+
+    const startPuzzle = async () => {
+        if (!topic) return;
+        setLoading(true);
+        setWords([]);
+        setGrid([]);
+        setFoundCount(0);
+        setSelectedCells([]);
+
+        const puzzleData = await generateWordPuzzle(topic);
+        if (puzzleData.length > 0) {
+            // Generate Grid Client Side
+            const newGrid = Array(gridSize).fill(null).map(() => Array(gridSize).fill(''));
+            const placedWords: PuzzleWord[] = [];
+
+            // Simple placement logic
+            for (let pw of puzzleData) {
+                const word = pw.word.toUpperCase().replace(/[^A-Z]/g, '');
+                if (word.length > gridSize) continue;
+                
+                let placed = false;
+                let attempts = 0;
+                while (!placed && attempts < 50) {
+                    const dir = Math.random() > 0.5 ? 'H' : 'V';
+                    const row = Math.floor(Math.random() * (dir === 'H' ? gridSize : gridSize - word.length));
+                    const col = Math.floor(Math.random() * (dir === 'H' ? gridSize - word.length : gridSize));
+                    
+                    // Check collision
+                    let canPlace = true;
+                    for (let i=0; i<word.length; i++) {
+                        const r = dir === 'H' ? row : row + i;
+                        const c = dir === 'H' ? col + i : col;
+                        if (newGrid[r][c] !== '' && newGrid[r][c] !== word[i]) {
+                            canPlace = false; break;
+                        }
+                    }
+                    
+                    if (canPlace) {
+                        for (let i=0; i<word.length; i++) {
+                            const r = dir === 'H' ? row : row + i;
+                            const c = dir === 'H' ? col + i : col;
+                            newGrid[r][c] = word[i];
+                        }
+                        placedWords.push({...pw, word: word}); // Use clean word
+                        placed = true;
+                    }
+                    attempts++;
+                }
+            }
+
+            // Fill empty
+            const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            for(let r=0; r<gridSize; r++) {
+                for(let c=0; c<gridSize; c++) {
+                    if (newGrid[r][c] === '') newGrid[r][c] = chars[Math.floor(Math.random() * chars.length)];
+                }
+            }
+            
+            setGrid(newGrid);
+            setWords(placedWords);
+        }
+        setLoading(false);
+    };
+
+    const handleCellClick = (r: number, c: number) => {
+        // Toggle selection
+        const idx = selectedCells.findIndex(cell => cell.r === r && cell.c === c);
+        let newSelection = [];
+        if (idx >= 0) {
+            newSelection = selectedCells.filter((_, i) => i !== idx);
+        } else {
+            newSelection = [...selectedCells, {r, c}];
+        }
+        // Sort by position to form string easily? No, strictly selection order is tricky.
+        // Let's assume user selects in order or we just check if the set of cells matches any word.
+        setSelectedCells(newSelection);
+
+        // Check Match
+        const selectedString = newSelection.map(cell => grid[cell.r][cell.c]).join('');
+        // Also check reverse? And check if cells are contiguous?
+        // Simplified: Check if constructed string matches any word.
+        // Actually, user might click out of order. Let's strictly check if the SET of selected cells corresponds to a word coordinates. 
+        // Too complex for this snippet. Let's do: User selects cells. If they form a word in any order (anagrams allowed? No).
+        
+        // Strict Contiguous Check is best but hard.
+        // Lazy approach: Combine letters. If it matches a word, mark found and clear selection.
+        
+        // Let's try to find if selected string is a word (or reverse)
+        const checkWord = (str: string) => {
+            const foundIdx = words.findIndex(w => !w.found && w.word === str);
+            if (foundIdx >= 0) {
+                const newWords = [...words];
+                newWords[foundIdx].found = true;
+                setWords(newWords);
+                setFoundCount(fc => fc + 1);
+                setSelectedCells([]);
+                showToast(`Found: ${str}`, 'success');
+                return true;
+            }
+            return false;
+        };
+        
+        // Construct string from selection sorted by R then C (row major)
+        const sorted = [...newSelection].sort((a,b) => (a.r - b.r) || (a.c - b.c));
+        const str = sorted.map(cell => grid[cell.r][cell.c]).join('');
+        
+        // Check standard & vertical (if col matches)
+        if (!checkWord(str)) {
+             // Try strict click order
+             const clickStr = newSelection.map(cell => grid[cell.r][cell.c]).join('');
+             checkWord(clickStr);
+        }
+    };
+
+    if (!words.length && !loading) return (
+        <div className="h-full flex flex-col items-center justify-center p-6 text-center">
+            <Grid size={64} className="mb-4 text-cyan-300" />
+            <h2 className="text-3xl font-bold mb-4">Word Mine</h2>
+            <p className="mb-8 opacity-60">Find hidden scientific terms generated by AI.</p>
+            <div className="relative w-full max-w-md">
+                <input className="w-full bg-white/10 rounded-full px-6 py-4 border border-white/20 outline-none focus:border-cyan-400" placeholder="Topic (e.g. Atoms)" value={topic} onChange={(e) => setTopic(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && startPuzzle()} />
+                <button onClick={startPuzzle} disabled={loading || !topic} className="absolute right-2 top-2 bottom-2 glass-button px-6 rounded-full font-bold bg-cyan-500/20 hover:bg-cyan-500/40">{loading ? <Loader2 className="animate-spin" /> : 'Mine'}</button>
+            </div>
+        </div>
+    );
+
+    return (
+        <div className="h-full flex flex-col md:flex-row p-6 gap-8 overflow-hidden">
+            <div className="flex-1 flex flex-col items-center">
+                <div className="flex w-full justify-between items-center mb-4 md:hidden">
+                    <h2 className="font-bold text-xl">{topic}</h2>
+                    <button onClick={() => setWords([])}><ArrowLeft/></button>
+                </div>
+                
+                <div className="glass-panel p-4 rounded-xl aspect-square w-full max-w-[500px] grid" style={{ gridTemplateColumns: `repeat(${gridSize}, 1fr)`, gridTemplateRows: `repeat(${gridSize}, 1fr)` }}>
+                    {grid.map((row, r) => row.map((char, c) => {
+                        const isSelected = selectedCells.some(cell => cell.r === r && cell.c === c);
+                        // Highlight found words? Complex without storing coords. 
+                        // Just highlight selected.
+                        return (
+                            <button 
+                                key={`${r}-${c}`} 
+                                onClick={() => handleCellClick(r, c)}
+                                className={`flex items-center justify-center font-bold text-sm md:text-xl rounded-md transition-colors ${isSelected ? 'bg-cyan-500 text-white' : 'hover:bg-white/10 text-white/70'}`}
+                            >
+                                {char}
+                            </button>
+                        );
+                    }))}
+                </div>
+                <div className="mt-4 flex gap-4">
+                     <button onClick={() => setSelectedCells([])} className="glass-button px-4 py-2 rounded-full text-xs">Clear Selection</button>
+                     {foundCount === words.length && <div className="text-green-400 font-bold animate-bounce">ALL WORDS FOUND!</div>}
+                </div>
+            </div>
+
+            <div className="w-full md:w-80 glass-panel rounded-xl p-6 flex flex-col overflow-hidden">
+                <h3 className="font-bold mb-4 flex items-center gap-2"><Search size={18}/> Clues ({foundCount}/{words.length})</h3>
+                <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3">
+                    {words.map((w, i) => (
+                        <div key={i} className={`p-3 rounded-lg border ${w.found ? 'bg-green-500/20 border-green-500/50' : 'bg-white/5 border-white/10'}`}>
+                            <div className="flex justify-between items-center mb-1">
+                                <span className={`font-bold ${w.found ? 'text-green-300 line-through' : 'text-cyan-300'}`}>
+                                    {w.found ? w.word : '???????'}
+                                </span>
+                                {w.found && <CheckCircle size={14} className="text-green-400"/>}
+                            </div>
+                            <p className="text-xs opacity-70">{w.clue}</p>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+};

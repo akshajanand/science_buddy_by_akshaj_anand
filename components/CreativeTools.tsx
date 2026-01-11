@@ -337,6 +337,32 @@ export const ConceptMap: React.FC<ConceptMapProps> = ({ userId, overrideData }) 
     };
     const handleMouseUp = () => setIsDragging(false);
 
+    // Touch Handlers for Mobile Panning
+    const handleTouchStart = (e: React.TouchEvent) => {
+        if (e.touches.length === 1) {
+            setIsDragging(true);
+            setLastMousePos({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+        }
+    };
+    const handleTouchMove = (e: React.TouchEvent) => {
+        // Prevent default scrolling when dragging
+        if (isDragging) {
+            e.preventDefault();
+        }
+
+        if (!isDragging || e.touches.length !== 1) return;
+        // Calculate delta
+        const dx = e.touches[0].clientX - lastMousePos.x;
+        const dy = e.touches[0].clientY - lastMousePos.y;
+        
+        // Update state
+        setViewState(prev => ({ ...prev, x: prev.x + dx, y: prev.y + dy }));
+        
+        // Update last pos
+        setLastMousePos({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+    };
+    const handleTouchEnd = () => setIsDragging(false);
+
     return (
         <div className="h-full flex gap-4 p-4 md:p-6 relative overflow-hidden">
             {!overrideData && (
@@ -376,8 +402,19 @@ export const ConceptMap: React.FC<ConceptMapProps> = ({ userId, overrideData }) 
                     </div>
                 )}
 
-                <div ref={containerRef} className="flex-1 relative rounded-3xl overflow-hidden bg-[#131316] border border-white/5 shadow-2xl min-h-[400px] cursor-grab active:cursor-grabbing"
-                    onWheel={handleWheel} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
+                <div 
+                    ref={containerRef} 
+                    className="flex-1 relative rounded-3xl overflow-hidden bg-[#131316] border border-white/5 shadow-2xl min-h-[400px] cursor-grab active:cursor-grabbing touch-none"
+                    style={{ touchAction: 'none' }}
+                    onWheel={handleWheel} 
+                    onMouseDown={handleMouseDown} 
+                    onMouseMove={handleMouseMove} 
+                    onMouseUp={handleMouseUp} 
+                    onMouseLeave={handleMouseUp}
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                >
                     
                     {/* Background Grid */}
                     <div className="absolute inset-0 opacity-20 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle, #444444 1px, transparent 1px)', backgroundSize: '24px 24px', transform: `translate(${viewState.x}px, ${viewState.y}px) scale(${viewState.scale})`, transformOrigin: 'center' }}></div>
@@ -422,6 +459,7 @@ export const ConceptMap: React.FC<ConceptMapProps> = ({ userId, overrideData }) 
                                             className="absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-all duration-200 hover:scale-105"
                                             onClick={(e) => { e.stopPropagation(); setSelectedNode(node.data); }}
                                             onMouseDown={(e) => e.stopPropagation()}
+                                            onTouchStart={(e) => e.stopPropagation()}
                                         >
                                             {node.isRoot ? (
                                                  <div className="bg-[#1a1a20] text-white px-6 py-3 rounded-full border border-cyan-500/50 shadow-[0_0_30px_rgba(6,182,212,0.3)] flex items-center gap-2 whitespace-nowrap z-20">
@@ -447,7 +485,7 @@ export const ConceptMap: React.FC<ConceptMapProps> = ({ userId, overrideData }) 
 
                     {/* Details Sidebar */}
                     {selectedNode && (
-                        <div className="absolute z-50 flex flex-col bg-[#1a1a20]/95 backdrop-blur-xl border border-white/10 shadow-2xl p-6 rounded-2xl md:right-6 md:top-6 md:w-80 md:bottom-auto inset-x-4 bottom-4 top-auto max-h-[60%] overflow-y-auto custom-scrollbar pointer-events-auto" onMouseDown={(e) => e.stopPropagation()}>
+                        <div className="absolute z-50 flex flex-col bg-[#1a1a20]/95 backdrop-blur-xl border border-white/10 shadow-2xl p-6 rounded-2xl md:right-6 md:top-6 md:w-80 md:bottom-auto inset-x-4 bottom-4 top-auto max-h-[60%] overflow-y-auto custom-scrollbar pointer-events-auto" onMouseDown={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
                             <div className="flex justify-between items-start mb-4">
                                 <h3 className="text-xl font-bold text-white">{selectedNode.label}</h3>
                                 <button onClick={() => setSelectedNode(null)} className="text-white/40 hover:text-white"><X size={18} /></button>

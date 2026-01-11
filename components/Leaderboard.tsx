@@ -16,7 +16,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ currentUserId, currentUserPoi
             // Fetch users ordered by total_points (All time)
             const { data, error } = await supabase
                 .from('users')
-                .select('id, username, total_points')
+                .select('id, username, display_name, avatar_url, total_points')
                 .order('total_points', { ascending: false })
                 .limit(20);
 
@@ -46,7 +46,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ currentUserId, currentUserPoi
         if (index === 0) return <Crown className="text-yellow-400 fill-yellow-400" size={24} />;
         if (index === 1) return <Medal className="text-gray-300 fill-gray-300" size={24} />;
         if (index === 2) return <Medal className="text-amber-600 fill-amber-600" size={24} />;
-        return <span className="font-bold text-white/50 w-6 text-center">{index + 1}</span>;
+        return <span className="font-bold opacity-50 w-6 text-center">{index + 1}</span>;
     };
 
     return (
@@ -56,21 +56,21 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ currentUserId, currentUserPoi
                     <Trophy size={40} className="text-yellow-300" />
                  </div>
                 <h2 className="text-3xl font-bold">Leaderboard</h2>
-                <p className="text-white/60">Top performing Science Buddies (All Time)</p>
+                <p className="opacity-60">Top performing Science Buddies (All Time)</p>
             </div>
 
             <div className="flex-1 overflow-y-auto custom-scrollbar max-w-2xl mx-auto w-full glass-panel rounded-2xl bg-black/20">
-                <div className="flex items-center justify-between p-4 border-b border-white/10 text-xs font-bold uppercase tracking-widest text-white/40">
+                <div className="flex items-center justify-between p-4 border-b border-white/10 text-xs font-bold uppercase tracking-widest opacity-40">
                     <span className="w-12 text-center">Rank</span>
                     <span className="flex-1 px-4">Student</span>
                     <span>Points</span>
                 </div>
                 
                 {loading ? (
-                    <div className="p-8 text-center text-white/30 animate-pulse">Loading ranks...</div>
+                    <div className="p-8 text-center opacity-30 animate-pulse">Loading ranks...</div>
                 ) : (
                     users.length === 0 ? (
-                        <div className="p-8 text-center text-white/30">
+                        <div className="p-8 text-center opacity-30">
                             No active scores yet. Be the first!
                         </div>
                     ) : (
@@ -81,11 +81,15 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ currentUserId, currentUserPoi
                             >
                                 <div className="w-12 flex justify-center">{getRankIcon(i)}</div>
                                 <div className="flex-1 px-4 flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
-                                        <User size={14} className="opacity-50" />
+                                    <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center overflow-hidden border border-white/10">
+                                        {u.avatar_url ? (
+                                            <img src={u.avatar_url} alt="Av" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <User size={14} className="opacity-50" />
+                                        )}
                                     </div>
-                                    <span className={`font-medium ${u.id === currentUserId ? 'text-cyan-300' : 'text-white'}`}>
-                                        {u.username} {u.id === currentUserId && '(You)'}
+                                    <span className={`font-medium ${u.id === currentUserId ? 'text-cyan-300' : ''}`}>
+                                        {u.display_name || u.username} {u.id === currentUserId && '(You)'}
                                     </span>
                                 </div>
                                 <div className="font-mono font-bold text-yellow-300">

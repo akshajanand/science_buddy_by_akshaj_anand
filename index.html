@@ -35,43 +35,58 @@
       }
     </script>
     <style>
+      :root {
+        --glass-bg: rgba(20, 20, 35, 0.6);
+        --glass-border: rgba(255, 255, 255, 0.1);
+        --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+        --text-color: #ffffff;
+        --text-muted: rgba(255, 255, 255, 0.6);
+      }
+
       body {
-        /* Dark Gradient Theme */
+        /* Default Dark Gradient Theme */
         background: linear-gradient(125deg, #020024, #090979, #2d0042, #000000);
         background-size: 300% 300%;
         animation: gradientBG 20s ease infinite;
-        color: white;
+        color: var(--text-color);
         margin: 0;
         overflow: hidden;
+        transition: color 0.5s ease;
       }
+
       @keyframes gradientBG {
         0% { background-position: 0% 50%; }
         50% { background-position: 100% 50%; }
         100% { background-position: 0% 50%; }
       }
+
       .glass-panel {
-        background: rgba(20, 20, 35, 0.4);
+        background: var(--glass-bg);
         backdrop-filter: blur(20px);
         -webkit-backdrop-filter: blur(20px);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+        border: 1px solid var(--glass-border);
+        box-shadow: var(--glass-shadow);
+        transition: background 0.5s ease, border-color 0.5s ease, box-shadow 0.5s ease;
       }
+
       .glass-button {
         background: rgba(255, 255, 255, 0.1);
         backdrop-filter: blur(4px);
-        border: 1px solid rgba(255, 255, 255, 0.15);
+        border: 1px solid var(--glass-border);
         transition: all 0.3s ease;
       }
+
       .glass-button:hover {
         background: rgba(255, 255, 255, 0.2);
         transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
       }
+
       .custom-scrollbar::-webkit-scrollbar {
         width: 6px;
       }
       .custom-scrollbar::-webkit-scrollbar-track {
-        background: rgba(0, 0, 0, 0.1);
+        background: rgba(0, 0, 0, 0.05);
       }
       .custom-scrollbar::-webkit-scrollbar-thumb {
         background: rgba(255, 255, 255, 0.2);

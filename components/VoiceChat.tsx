@@ -26,6 +26,9 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ userProfile, userId, initialSessi
     const statusRef = useRef(status);
     const autoModeRef = useRef(autoMode);
     
+    // IMPORTANT: Track history in a ref to avoid stale closures in speech recognition callbacks
+    const sessionHistoryRef = useRef<ChatMessage[]>(sessionHistory);
+    
     // Tracks if the current session is a draft (unsaved)
     const isDraftRef = useRef(false);
 
@@ -33,7 +36,8 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ userProfile, userId, initialSessi
     useEffect(() => {
         statusRef.current = status;
         autoModeRef.current = autoMode;
-    }, [status, autoMode]);
+        sessionHistoryRef.current = sessionHistory;
+    }, [status, autoMode, sessionHistory]);
 
     // Initialization Logic
     useEffect(() => {
@@ -242,6 +246,10 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ userProfile, userId, initialSessi
         setStatus('PROCESSING');
         
         // 1. Local Update (User)
+        // CRITICAL FIX: Use the ref to get the absolute latest history, 
+        // avoiding stale closure issues from the speech recognition callback.
+        const currentHistory = sessionHistoryRef.current;
+        
         const userMsg: ChatMessage = {
             id: Date.now().toString(),
             role: 'user',
@@ -249,7 +257,8 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ userProfile, userId, initialSessi
             timestamp: Date.now(),
             meta: { type: 'voice' }
         };
-        const historyWithUser = [...sessionHistory, userMsg];
+        
+        const historyWithUser = [...currentHistory, userMsg];
         setSessionHistory(historyWithUser);
         
         // 2. Persist to DB (Creates row if draft)

@@ -27,11 +27,36 @@ const CommunityNotes: React.FC<CommunityNotesProps> = ({ userId, username }) => 
 
     const fetchNotes = async () => {
         setLoading(true);
-        const { data } = await supabase
+        // We now fetch avatar/display_name from the joined users table if we had relations, 
+        // but for simplicity/speed in this flat structure, we rely on what was saved 
+        // OR we can do a quick join. Since Supabase types here are loose, we can try to join.
+        // However, to keep it simple with existing row structure, we'll fetch just notes. 
+        // NOTE: Ideally, CommunityNote rows should link to user profile. 
+        // Let's assume we save snapshot or fetch user details.
+        
+        // BETTER APPROACH: Fetch notes, then fetch user profiles for them.
+        const { data: notesData } = await supabase
             .from('community_notes')
             .select('*')
             .order('created_at', { ascending: false });
-        if (data) setNotes(data);
+            
+        if (notesData) {
+            // Get unique user IDs
+            const userIds = [...new Set(notesData.map(n => n.user_id))];
+            const { data: usersData } = await supabase.from('users').select('id, display_name, avatar_url, username').in('id', userIds);
+            
+            // Map profiles to notes
+            const enrichedNotes = notesData.map(note => {
+                const author = usersData?.find(u => u.id === note.user_id);
+                return {
+                    ...note,
+                    display_name: author?.display_name || author?.username || note.username,
+                    avatar_url: author?.avatar_url
+                };
+            });
+            
+            setNotes(enrichedNotes);
+        }
         setLoading(false);
     };
 
@@ -93,7 +118,7 @@ const CommunityNotes: React.FC<CommunityNotesProps> = ({ userId, username }) => 
 
             const { data, error } = await supabase.from('community_notes').insert({
                 user_id: userId,
-                username: username,
+                username: username, // Fallback
                 title: noteTitle,
                 content: finalContent,
                 file_type: fileTypeStr
@@ -101,7 +126,8 @@ const CommunityNotes: React.FC<CommunityNotesProps> = ({ userId, username }) => 
 
             if (error) throw error;
             
-            setNotes(prev => [data, ...prev]);
+            // Re-fetch to get profile data
+            await fetchNotes();
             
             // Reset Form
             setShowUpload(false);
@@ -122,7 +148,7 @@ const CommunityNotes: React.FC<CommunityNotesProps> = ({ userId, username }) => 
             <div className="flex justify-between items-end mb-6">
                 <div>
                     <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-orange-300 to-pink-300">Community Notes</h2>
-                    <p className="text-white/60">Share your revision notes, summaries, or files.</p>
+                    <p className="opacity-60">Share your revision notes, summaries, or files.</p>
                 </div>
                 <button 
                     onClick={() => setShowUpload(true)} 
@@ -143,9 +169,9 @@ const CommunityNotes: React.FC<CommunityNotesProps> = ({ userId, username }) => 
                         
                         <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2">
                             <div>
-                                <label className="block text-sm font-bold text-white/60 mb-1 ml-1">TITLE</label>
+                                <label className="block text-sm font-bold opacity-60 mb-1 ml-1">TITLE</label>
                                 <input 
-                                    className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-cyan-400 outline-none" 
+                                    className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 focus:border-cyan-400 outline-none" 
                                     placeholder="e.g. Force and Pressure Revision"
                                     value={noteTitle}
                                     onChange={(e) => setNoteTitle(e.target.value)}
@@ -153,9 +179,9 @@ const CommunityNotes: React.FC<CommunityNotesProps> = ({ userId, username }) => 
                             </div>
 
                             <div>
-                                <label className="block text-sm font-bold text-white/60 mb-1 ml-1">YOUR NOTES (UNLIMITED TEXT)</label>
+                                <label className="block text-sm font-bold opacity-60 mb-1 ml-1">YOUR NOTES (UNLIMITED TEXT)</label>
                                 <textarea 
-                                    className="w-full h-48 bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-cyan-400 outline-none resize-none custom-scrollbar"
+                                    className="w-full h-48 bg-black/30 border border-white/10 rounded-xl px-4 py-3 focus:border-cyan-400 outline-none resize-none custom-scrollbar"
                                     placeholder="Type your detailed notes here..."
                                     value={noteDescription}
                                     onChange={(e) => setNoteDescription(e.target.value)}
@@ -163,7 +189,7 @@ const CommunityNotes: React.FC<CommunityNotesProps> = ({ userId, username }) => 
                             </div>
 
                             <div>
-                                <label className="block text-sm font-bold text-white/60 mb-1 ml-1">ATTACHMENT (OPTIONAL)</label>
+                                <label className="block text-sm font-bold opacity-60 mb-1 ml-1">ATTACHMENT (OPTIONAL)</label>
                                 <div className="border-2 border-dashed border-white/20 rounded-xl p-6 text-center hover:border-cyan-500 transition-colors bg-white/5">
                                     <input 
                                         type="file" 
@@ -211,15 +237,20 @@ const CommunityNotes: React.FC<CommunityNotesProps> = ({ userId, username }) => 
                                 {selectedNote.file_type === 'PDF' ? <FileType size={24}/> : selectedNote.file_type === 'IMAGE' ? <Image size={24}/> : <FileText size={24}/>}
                             </div>
                             <div>
-                                <h3 className="font-bold text-xl">{selectedNote.title}</h3>
-                                <p className="text-sm opacity-50 flex items-center gap-2"><User size={12}/> {selectedNote.username} • {new Date(selectedNote.created_at).toLocaleDateString()}</p>
+                                <h3 className="font-bold text-xl text-white">{selectedNote.title}</h3>
+                                <p className="text-sm opacity-50 flex items-center gap-2 text-white">
+                                    <div className="w-4 h-4 rounded-full overflow-hidden bg-white/10">
+                                        {selectedNote.avatar_url ? <img src={selectedNote.avatar_url} className="w-full h-full object-cover"/> : <User size={12}/>}
+                                    </div>
+                                    {selectedNote.display_name || selectedNote.username} • {new Date(selectedNote.created_at).toLocaleDateString()}
+                                </p>
                             </div>
                         </div>
-                        <button onClick={() => setSelectedNote(null)} className="p-2 glass-button rounded-full hover:bg-white/20"><X/></button>
+                        <button onClick={() => setSelectedNote(null)} className="p-2 glass-button rounded-full hover:bg-white/20 text-white"><X/></button>
                     </div>
                     <div className="flex-1 overflow-y-auto custom-scrollbar p-8 bg-[#0a0a0f]">
                         <div className="max-w-4xl mx-auto bg-white/5 p-8 rounded-2xl border border-white/10 shadow-2xl">
-                             <div className="whitespace-pre-wrap leading-relaxed opacity-90 font-sans text-base md:text-lg">
+                             <div className="whitespace-pre-wrap leading-relaxed opacity-90 font-sans text-base md:text-lg text-white">
                                 {selectedNote.content}
                             </div>
                         </div>
@@ -245,7 +276,10 @@ const CommunityNotes: React.FC<CommunityNotesProps> = ({ userId, username }) => 
                             <h3 className="font-bold text-lg mb-2 line-clamp-1 group-hover:text-cyan-300 transition-colors">{note.title}</h3>
                             <p className="text-sm opacity-50 line-clamp-3 mb-4 flex-1">{note.content.substring(0, 100)}...</p>
                             <div className="flex items-center gap-2 text-xs opacity-50 mt-auto pt-4 border-t border-white/5">
-                                <User size={12}/> {note.username}
+                                <div className="w-5 h-5 rounded-full overflow-hidden bg-white/10 border border-white/10">
+                                    {note.avatar_url ? <img src={note.avatar_url} className="w-full h-full object-cover"/> : <User size={12} className="w-full h-full p-1"/>}
+                                </div>
+                                {note.display_name || note.username}
                             </div>
                         </div>
                     ))}

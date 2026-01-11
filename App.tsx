@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   MessageSquare, Book, Zap, 
-  Search, Headphones, Network, PenTool, Menu, X, Brain, Puzzle, LogOut, Loader2, Sparkles, CheckCircle, Atom, Mic, LayoutDashboard, Layers, Trophy, BarChart2, FileText, Users, Wifi, Shield, Database, Cpu, AlertTriangle, Send
+  Search, Headphones, Network, PenTool, Menu, X, Brain, Puzzle, LogOut, Loader2, Sparkles, CheckCircle, Atom, Mic, LayoutDashboard, Layers, Trophy, BarChart2, FileText, Users, Wifi, Shield, Database, Cpu, AlertTriangle, Send, Settings, Palette, User, Upload, Image as ImageIcon, Lock, Server
 } from 'lucide-react';
 import emailjs from '@emailjs/browser';
 import { AppView, ChatSession } from './types';
@@ -28,6 +28,9 @@ interface UserData {
     interests: string;
     total_points?: number;
     last_reset_date?: string;
+    avatar_url?: string;
+    display_name?: string;
+    ui_theme?: string;
 }
 
 const SCIENCE_FACTS = [
@@ -41,27 +44,53 @@ const SCIENCE_FACTS = [
     "Sound travels 4 times faster in water than it does in air."
 ];
 
+const THEMES = {
+    'default': { name: 'Cosmic Default', gradient: 'linear-gradient(125deg, #020024, #090979, #2d0042, #000000)', accent: 'text-cyan-300' },
+    'blue': { name: 'Deep Sea', gradient: 'linear-gradient(125deg, #001f3f, #003366, #00509e, #000033)', accent: 'text-blue-300' },
+    'green': { name: 'Bio Lab', gradient: 'linear-gradient(125deg, #022c22, #14532d, #064e3b, #000000)', accent: 'text-green-300' },
+    'red': { name: 'Volcano', gradient: 'linear-gradient(125deg, #450a0a, #7f1d1d, #991b1b, #000000)', accent: 'text-red-300' },
+    'formal_dark': { name: 'Formal Dark', gradient: 'linear-gradient(125deg, #0f172a, #1e293b, #0f172a)', accent: 'text-slate-300' },
+    'formal_light': { name: 'Formal Light', gradient: 'linear-gradient(125deg, #e2e8f0, #f8fafc, #f1f5f9)', accent: 'text-slate-600' },
+};
+
+const LOADING_STEPS = [
+    { label: "Establishing Secure Connection", icon: Wifi },
+    { label: "Verifying User Credentials", icon: Lock },
+    { label: "Syncing Cloud Database", icon: Server },
+    { label: "Optimizing AI Neural Net", icon: Cpu },
+    { label: "Finalizing Interface", icon: LayoutDashboard }
+];
+
 const App: React.FC = () => {
   const [user, setUser] = useState<UserData | null>(null);
   const [currentView, setCurrentView] = useState<AppView>(AppView.DASHBOARD);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [loadingMessage, setLoadingMessage] = useState("Initializing System...");
   const [currentFact, setCurrentFact] = useState(SCIENCE_FACTS[0]);
   
-  // Feedback State
+  // Settings & Feedback State
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+  
+  // Feedback Form
   const [feedbackText, setFeedbackText] = useState('');
-  const [feedbackName, setFeedbackName] = useState('');
+  const [feedbackEmail, setFeedbackEmail] = useState('');
   const [isSendingFeedback, setIsSendingFeedback] = useState(false);
+
+  // Settings Form
+  const [settingsName, setSettingsName] = useState('');
+  const [settingsAvatar, setSettingsAvatar] = useState('');
+  const [settingsTheme, setSettingsTheme] = useState('default');
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   
   // Session State
   const [targetSessionId, setTargetSessionId] = useState<string | null>(null);
   // Topic State
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   
-  // Loading Stage: 0-4 for distinct visual phases
-  const [loadingStage, setLoadingStage] = useState(0);
+  // Loading State
+  const [loadingStage, setLoadingStage] = useState(0); // 0 to 5
 
   // Cycle facts during loading
   useEffect(() => {
@@ -72,137 +101,95 @@ const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [loading]);
 
-  // Prefill name when feedback opens
+  // Apply Theme
   useEffect(() => {
-      if (isFeedbackOpen && user) {
-          setFeedbackName(user.username);
+    const themeKey = user?.ui_theme || 'default';
+    const theme = THEMES[themeKey as keyof typeof THEMES] || THEMES['default'];
+    
+    document.body.style.background = theme.gradient;
+    document.body.style.backgroundSize = "300% 300%";
+    
+    const root = document.documentElement;
+    if (themeKey === 'formal_light') {
+        root.style.setProperty('--glass-bg', 'rgba(255, 255, 255, 0.7)');
+        root.style.setProperty('--glass-border', 'rgba(0, 0, 0, 0.1)');
+        root.style.setProperty('--glass-shadow', '0 8px 32px 0 rgba(0, 0, 0, 0.1)');
+        root.style.setProperty('--text-color', '#1e293b');
+        root.style.setProperty('--text-muted', 'rgba(30, 41, 59, 0.6)');
+    } else {
+        // Dark themes
+        root.style.setProperty('--glass-bg', 'rgba(20, 20, 35, 0.6)');
+        root.style.setProperty('--glass-border', 'rgba(255, 255, 255, 0.1)');
+        root.style.setProperty('--glass-shadow', '0 8px 32px 0 rgba(0, 0, 0, 0.5)');
+        root.style.setProperty('--text-color', '#ffffff');
+        root.style.setProperty('--text-muted', 'rgba(255, 255, 255, 0.6)');
+    }
+  }, [user?.ui_theme]);
+
+  // Initialize Settings Form when opened
+  useEffect(() => {
+      if (isSettingsOpen && user) {
+          setSettingsName(user.display_name || user.username || '');
+          setSettingsAvatar(user.avatar_url || '');
+          setSettingsTheme(user.ui_theme || 'default');
       }
-  }, [isFeedbackOpen, user]);
+  }, [isSettingsOpen, user]);
 
   const runLoadingSequence = async (userData: UserData) => {
     setLoading(true);
     setLoadingStage(0);
 
-    // --- DYNAMIC LOADING LOGIC ---
-    // Randomize speed factor to simulate real environment variability
-    const rand = Math.random();
-    let speedFactor = 1.0;
-    let modeText = "Standard";
+    // Random duration selection: 5s, 7s, or 10s
+    const r = Math.random();
+    const totalDuration = r < 0.33 ? 5000 : r < 0.66 ? 7000 : 10000;
+    
+    // Distribute duration across steps (weighted for realism)
+    const step1 = totalDuration * 0.10; // Connection (Fast)
+    const step2 = totalDuration * 0.15; // Verify
+    const step3 = totalDuration * 0.35; // Cloud Sync (Slowest)
+    const step4 = totalDuration * 0.25; // AI Optimization
+    const step5 = totalDuration * 0.15; // Finalize
+    
+    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-    if (rand < 0.25) { 
-        speedFactor = 0.3; // Very Fast
-        modeText = "Optimized";
-    } else if (rand < 0.75) { 
-        speedFactor = 1.0; // Normal
-        modeText = "Standard";
-    } else if (rand < 0.95) { 
-        speedFactor = 1.8; // Slow
-        modeText = "Deep Scan";
-    } else { 
-        speedFactor = 2.8; // Very Slow
-        modeText = "Comprehensive";
-    }
-
-    const delay = (ms: number) => new Promise(r => setTimeout(r, ms * speedFactor));
-
-    // STEP 1: Establish Connection
-    setLoadingMessage(`Establishing Secure Link (${modeText})...`);
-    await delay(1500);
+    // Step 1: Secure Connection
     setLoadingStage(1);
+    await delay(step1);
 
-    // STEP 2: Verify Security/User
-    setLoadingMessage("Verifying User Protocols...");
-    await delay(1500);
+    // Step 2: Verification
     setLoadingStage(2);
+    await delay(step2);
 
-    // STEP 3: Load Assets & Pre-fetch Data
-    setLoadingMessage(speedFactor > 1.5 ? "Downloading Large Educational Assets..." : "Syncing Assets...");
+    // Step 3: Syncing
+    setLoadingStage(3);
     try {
-        // Pre-fetch EXTENSIVE data for Deep AI Profiling
-        const [sessionsRes, quizRes, leaderboardRes, researchRes, libraryRes] = await Promise.all([
-            // 1. Fetch recent sessions
-            supabase.from('chat_sessions')
-                .select('*')
-                .eq('user_id', userData.id)
-                .order('created_at', { ascending: false })
-                .limit(10),
-            // 2. Fetch quiz progress
-            supabase.from('quiz_progress')
-                .select('topic, score')
-                .eq('user_id', userData.id)
-                .limit(5),
-            // 3. Leaderboard for Rank
-            supabase.from('users')
-                .select('id, total_points')
-                .order('total_points', { ascending: false }),
-            // 4. Research Projects
-            supabase.from('research_projects')
-                .select('title')
-                .eq('user_id', userData.id)
-                .limit(5),
-             // 5. Study Library
-            supabase.from('study_library')
-                .select('topic')
-                .eq('user_id', userData.id)
-                .limit(5)
-        ]);
-        
-        await delay(1000);
-        setLoadingStage(3);
-
-        // STEP 4: AI Analysis with FULL CONTEXT
-        setLoadingMessage("Calibrating Neural Network...");
-        
-        // Calculate Rank Manually
-        let rank = '-';
-        if (leaderboardRes.data) {
-             const index = leaderboardRes.data.findIndex(u => u.id === userData.id);
-             if (index !== -1) rank = (index + 1).toString();
-        }
-
         const fullProfileData = {
-            sessions: sessionsRes.data || [],
-            rank: rank,
-            totalPoints: userData.total_points || 0,
-            totalStudents: leaderboardRes.data?.length || 0,
-            recentQuizScores: quizRes.data || [],
-            researchTopics: researchRes.data?.map(r => r.title) || [],
-            savedPodTopics: libraryRes.data?.map(l => l.topic) || []
+            sessions: [], rank: 0, totalPoints: userData.total_points || 0,
+            totalStudents: 0, recentQuizScores: [], researchTopics: [], savedPodTopics: []
         };
-        
-        // Always run analysis if we have ANY data, not just chat sessions
-        const hasData = fullProfileData.sessions.length > 0 || fullProfileData.recentQuizScores.length > 0;
-        
-        if (hasData) {
-            const analysis = await analyzeUserProfile(fullProfileData);
-            if (analysis.interests) {
-                const updatedUser = { 
-                    ...userData, 
-                    interests: analysis.interests,
-                };
-                setUser(updatedUser);
-                localStorage.setItem('science_buddy_user', JSON.stringify(updatedUser));
-                // Background sync
-                supabase.from('users').update({ interests: analysis.interests }).eq('id', userData.id).then();
-            }
-        }
-    } catch (e) {
-        console.error("Loading sequence error", e);
-    }
-    
-    await delay(1500);
+        // Trigger background analysis
+        analyzeUserProfile(fullProfileData).then(analysis => {
+             if (analysis.interests) {
+                 supabase.from('users').update({ interests: analysis.interests }).eq('id', userData.id).then();
+             }
+        });
+    } catch (e) { console.error(e); }
+    await delay(step3);
 
-    // STEP 5: Finalize
+    // Step 4: Optimizing AI
     setLoadingStage(4);
-    setLoadingMessage("Systems Online. Welcome.");
-    await delay(1000);
+    await delay(step4);
+
+    // Step 5: Finalizing
+    setLoadingStage(5);
+    await delay(step5);
     
-    // Ensure we start on Dashboard
+    // Complete
     setCurrentView(AppView.DASHBOARD);
     setLoading(false);
   };
 
-  // Check Local Storage on Mount
+  // Check Local Storage
   useEffect(() => {
     const savedUser = localStorage.getItem('science_buddy_user');
     if (savedUser) {
@@ -213,26 +200,6 @@ const App: React.FC = () => {
         setLoading(false);
     }
   }, []);
-
-  const refreshUserScore = async (addedPoints: number = 0) => {
-      if (!user) return;
-      
-      // OPTIMISTIC UPDATE
-      if (addedPoints > 0) {
-          const optimisticPoints = (user.total_points || 0) + addedPoints;
-          const updatedUser = { ...user, total_points: optimisticPoints };
-          setUser(updatedUser);
-          localStorage.setItem('science_buddy_user', JSON.stringify(updatedUser));
-      } else {
-          // If no specific points added (general sync), fetch from DB
-          const { data } = await supabase.from('users').select('total_points').eq('id', user.id).single();
-          if (data) {
-              const updatedUser = { ...user, total_points: data.total_points };
-              setUser(updatedUser);
-              localStorage.setItem('science_buddy_user', JSON.stringify(updatedUser));
-          }
-      }
-  };
 
   const handleLogin = (userData: UserData) => {
       setUser(userData);
@@ -245,49 +212,61 @@ const App: React.FC = () => {
     setUser(null);
   };
 
-  const handleUpdateProfile = async (newProfile: {name?: string | null, interests?: string}) => {
-    if (!user) return;
-    
-    // Optimistic UI update
-    const updatedUser = { ...user, username: newProfile.name || user.username, interests: newProfile.interests || '' };
-    setUser(updatedUser);
-    localStorage.setItem('science_buddy_user', JSON.stringify(updatedUser));
-
-    try {
-        const { error } = await supabase
-            .from('users')
-            .update({
-                interests: newProfile.interests,
-            })
-            .eq('id', user.id);
-
-        if (error) console.error("Supabase profile error", error);
-    } catch (e) {
-        console.error("Profile save failed", e);
-    }
-  };
-  
-  const handleResumeSession = (session: ChatSession) => {
-      setTargetSessionId(session.id);
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (!e.target.files || e.target.files.length === 0 || !user) return;
       
-      // Determine if Voice or Text
-      const isVoice = session.title.toLowerCase().includes('voice') || session.messages[0]?.meta?.type === 'voice';
+      const file = e.target.files[0];
+      setUploadingAvatar(true);
       
-      if (isVoice) {
-          setCurrentView(AppView.VOICE_CHAT);
-      } else {
-          setCurrentView(AppView.CHAT);
+      try {
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${user.id}-${Math.random()}.${fileExt}`;
+          const filePath = `${fileName}`;
+
+          const { error: uploadError } = await supabase.storage
+              .from('avatars')
+              .upload(filePath, file);
+
+          if (uploadError) {
+              throw uploadError;
+          }
+
+          const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
+          setSettingsAvatar(data.publicUrl);
+          showToast('Image uploaded! Click Save to apply.', 'success');
+      } catch (error: any) {
+          console.error("Upload error", error);
+          showToast('Failed to upload image. ' + error.message, 'error');
+      } finally {
+          setUploadingAvatar(false);
       }
   };
 
-  const handleSelectTopic = (topic: string) => {
-      setSelectedTopic(topic);
-      if (currentView !== AppView.TOPICS) setCurrentView(AppView.TOPICS);
+  const handleSaveSettings = async () => {
+      if (!user) return;
+      setIsSavingSettings(true);
+      
+      const updates = {
+          display_name: settingsName,
+          avatar_url: settingsAvatar,
+          ui_theme: settingsTheme
+      };
+
+      // Optimistic Update
+      const updatedUser = { ...user, ...updates };
+      setUser(updatedUser);
+      localStorage.setItem('science_buddy_user', JSON.stringify(updatedUser));
+
+      await supabase.from('users').update(updates).eq('id', user.id);
+      
+      showToast("Settings saved!", "success");
+      setIsSavingSettings(false);
+      setIsSettingsOpen(false);
   };
 
   const handleSendFeedback = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!feedbackText.trim() || !feedbackName.trim()) return;
+    if (!feedbackText.trim()) return;
     
     setIsSendingFeedback(true);
     
@@ -296,18 +275,20 @@ const App: React.FC = () => {
             'service_4rd3ex6',
             'template_ld5md57',
             {
-                from_name: feedbackName,
-                message: `Username: ${user?.username}\n\n${feedbackText}`,
-                reply_to: 'No Reply'
+                from_name: user?.username || 'User',
+                user_email: feedbackEmail || 'Not Provided',
+                message: `Username: ${user?.username}\nEmail: ${feedbackEmail}\n\n${feedbackText}`,
+                reply_to: feedbackEmail || 'No Reply'
             },
             'X1eYkPAczlxtDVjnw'
         );
-        showToast('Feedback sent successfully!', 'success');
+        showToast('Report sent successfully!', 'success');
         setFeedbackText('');
+        setFeedbackEmail('');
         setIsFeedbackOpen(false);
     } catch (error) {
         console.error('EmailJS Error:', error);
-        showToast('Failed to send feedback. Please try again.', 'error');
+        showToast('Failed to send report.', 'error');
     } finally {
         setIsSendingFeedback(false);
     }
@@ -318,7 +299,7 @@ const App: React.FC = () => {
     { id: AppView.TOPICS, label: 'Topics', icon: Layers }, 
     { id: AppView.PERFORMANCE, label: 'My Performance', icon: BarChart2 }, 
     { id: AppView.RESEARCH, label: 'Research Lab', icon: FileText },
-    { id: AppView.COMMUNITY, label: 'Community Notes', icon: Users }, // New
+    { id: AppView.COMMUNITY, label: 'Community Notes', icon: Users }, 
     { id: AppView.LEADERBOARD, label: 'Leaderboard', icon: Trophy }, 
     { id: AppView.CHAT, label: 'AI Chat', icon: MessageSquare },
     { id: AppView.VOICE_CHAT, label: 'Voice Chat', icon: Mic },
@@ -332,7 +313,6 @@ const App: React.FC = () => {
   ];
 
   const renderContent = () => {
-    // Special handling for Topics/TopicQuiz
     if (currentView === AppView.TOPICS) {
         if (selectedTopic) {
             return <TopicQuiz 
@@ -340,10 +320,10 @@ const App: React.FC = () => {
                 topic={selectedTopic}
                 userInterests={user!.interests}
                 onBack={() => setSelectedTopic(null)}
-                onScoreUpdate={refreshUserScore}
+                onScoreUpdate={() => {}} 
             />;
         }
-        return <TopicsDashboard userId={user!.id} onSelectTopic={handleSelectTopic} />;
+        return <TopicsDashboard userId={user!.id} onSelectTopic={setSelectedTopic} />;
     }
 
     switch (currentView) {
@@ -351,22 +331,21 @@ const App: React.FC = () => {
         return <Dashboard 
             user={user!} 
             onNavigate={setCurrentView} 
-            onResumeSession={handleResumeSession} 
-            onResumeTopic={handleSelectTopic}
+            onResumeSession={(s) => {
+                setTargetSessionId(s.id);
+                setCurrentView(s.title.includes('Voice') ? AppView.VOICE_CHAT : AppView.CHAT);
+            }} 
+            onResumeTopic={setSelectedTopic}
             onReportIssue={() => setIsFeedbackOpen(true)}
         />;
       case AppView.PERFORMANCE:
-          return <PerformanceAnalytics 
-              userId={user!.id} 
-              username={user!.username} 
-              currentUserPoints={user!.total_points || 0} 
-          />;
+          return <PerformanceAnalytics userId={user!.id} username={user!.username} currentUserPoints={user!.total_points || 0} />;
       case AppView.RESEARCH: return <ResearchMode userId={user!.id} username={user!.username} />;
       case AppView.COMMUNITY: return <CommunityNotes userId={user!.id} username={user!.username} />;
       case AppView.CHAT: 
         return <ChatInterface 
             userProfile={{ name: user?.username, interests: user?.interests }} 
-            onUpdateProfile={handleUpdateProfile} 
+            onUpdateProfile={() => {}} 
             userId={user?.id}
             initialSessionId={targetSessionId}
         />;
@@ -377,10 +356,7 @@ const App: React.FC = () => {
             initialSessionId={targetSessionId}
         />;
       case AppView.LEADERBOARD: 
-        return <Leaderboard 
-            currentUserId={user!.id} 
-            currentUserPoints={user!.total_points || 0} 
-        />;
+        return <Leaderboard currentUserId={user!.id} currentUserPoints={user!.total_points || 0} />;
       case AppView.STORY: return <InteractiveStory />;
       case AppView.QUIZ: return <QuizModule />;
       case AppView.STYLE_SWAPPER: return <StyleSwapper />;
@@ -388,79 +364,81 @@ const App: React.FC = () => {
       case AppView.STUDY_POD: return <StudyPod userId={user!.id} />;
       case AppView.PUZZLE: return <WordPuzzle />;
       case AppView.MATCHING: return <MindMatch />;
-      default: return <Dashboard user={user!} onNavigate={setCurrentView} onResumeSession={handleResumeSession} onResumeTopic={handleSelectTopic} onReportIssue={() => setIsFeedbackOpen(true)} />;
+      default: return null;
     }
   };
 
   if (loading && user) {
      return (
-        <div className="h-[100dvh] w-screen flex flex-col items-center justify-center bg-black text-white relative overflow-hidden font-sans">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-indigo-900/40 via-black to-black" />
-            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
-            
-            <div className="relative z-10 flex flex-col items-center max-w-md w-full p-8">
-                {/* Visual Centerpiece */}
-                <div className="relative mb-12 group transition-all duration-1000">
-                    <div className="absolute inset-0 bg-cyan-500/20 blur-[60px] rounded-full animate-pulse"></div>
-                    
-                    {/* Dynamic Icon based on stage */}
-                    <div className="relative z-10 text-cyan-300 transform transition-all duration-500">
-                        {loadingStage === 0 && <Wifi size={80} className="animate-pulse" />}
-                        {loadingStage === 1 && <Shield size={80} className="animate-bounce" />}
-                        {loadingStage === 2 && <Database size={80} className="animate-pulse" />}
-                        {loadingStage === 3 && <Brain size={80} className="animate-pulse" />}
-                        {loadingStage === 4 && <CheckCircle size={80} className="scale-110 text-green-400" />}
-                    </div>
+        <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-[#050505] text-white font-sans overflow-hidden">
+             {/* Background Effects */}
+             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-indigo-900/20 via-[#050505] to-[#050505] animate-pulse"></div>
+             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-500 to-transparent opacity-50"></div>
+             <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-purple-500 to-transparent opacity-50"></div>
 
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 border border-cyan-500/30 rounded-full animate-[spin_10s_linear_infinite_reverse]"></div>
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 border-2 border-dotted border-purple-500/30 rounded-full animate-[spin_15s_linear_infinite]"></div>
-                </div>
-                
-                <h2 className="text-4xl font-bold tracking-tight mb-2 bg-clip-text text-transparent bg-gradient-to-r from-cyan-200 via-white to-purple-200 text-center">
-                    Science Buddy
-                </h2>
-                <div className="h-6 mb-8 text-center w-full">
-                    <p className="text-cyan-400/80 font-mono text-sm uppercase tracking-[0.2em] animate-pulse">
-                        {loadingMessage}
-                    </p>
-                </div>
+             <div className="w-full max-w-md relative z-10 flex flex-col items-center">
+                 {/* Central Orb/Spinner */}
+                 <div className="relative mb-12">
+                     <div className="absolute inset-0 bg-cyan-500/20 rounded-full blur-2xl animate-pulse"></div>
+                     <div className="relative z-10 p-6 bg-white/5 rounded-full border border-white/10 backdrop-blur-md shadow-2xl">
+                        <Atom size={64} className="text-cyan-400 animate-[spin_3s_linear_infinite]" />
+                     </div>
+                     {/* Orbital Ring 1 */}
+                     <div className="absolute inset-[-10px] border border-cyan-500/30 rounded-full animate-[spin_4s_linear_infinite_reverse] border-t-transparent border-r-transparent"></div>
+                     {/* Orbital Ring 2 */}
+                     <div className="absolute inset-[-20px] border border-purple-500/30 rounded-full animate-[spin_6s_linear_infinite] border-b-transparent border-l-transparent"></div>
+                 </div>
 
-                {/* Multi-stage Progress Bar */}
-                <div className="w-full flex gap-1 mb-8">
-                    {[0, 1, 2, 3, 4].map((step) => (
-                        <div key={step} className="h-1.5 flex-1 bg-white/10 rounded-full overflow-hidden">
-                            <div 
-                                className={`h-full transition-all duration-500 ${loadingStage >= step ? 'bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.5)]' : 'bg-transparent'}`}
-                            ></div>
-                        </div>
-                    ))}
-                </div>
-                
-                {/* Checkpoints */}
-                <div className="flex justify-between w-full px-4 mb-12 opacity-70">
-                    <div className={`flex flex-col items-center gap-2 transition-all duration-500 ${loadingStage >= 1 ? 'text-cyan-300' : 'text-white/20'}`}>
-                        <Shield size={16} />
-                    </div>
-                    <div className={`flex flex-col items-center gap-2 transition-all duration-500 ${loadingStage >= 2 ? 'text-purple-300' : 'text-white/20'}`}>
-                        <Database size={16} />
-                    </div>
-                    <div className={`flex flex-col items-center gap-2 transition-all duration-500 ${loadingStage >= 3 ? 'text-pink-300' : 'text-white/20'}`}>
-                        <Brain size={16} />
-                    </div>
-                     <div className={`flex flex-col items-center gap-2 transition-all duration-500 ${loadingStage >= 4 ? 'text-green-300' : 'text-white/20'}`}>
-                        <CheckCircle size={16} />
-                    </div>
-                </div>
+                 <h2 className="text-2xl font-bold mb-8 tracking-widest uppercase text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400 animate-pulse">
+                    System Initialization
+                 </h2>
 
-                <div className="glass-panel p-4 rounded-xl text-center min-h-[100px] flex items-center justify-center border border-white/5 bg-black/40 w-full animate-in fade-in duration-700 key={currentFact}">
-                    <p className="text-white/80 text-sm italic leading-relaxed">
-                        <span className="text-purple-400 font-bold mr-2">✦</span>
-                        {currentFact}
-                    </p>
-                </div>
-            </div>
-            
-            <div className="absolute bottom-6 text-xs text-white/20">v2.4 • System Optimized</div>
+                 {/* 5 Step Checklist */}
+                 <div className="w-full space-y-4 px-8">
+                     {LOADING_STEPS.map((step, index) => {
+                         const stepNum = index + 1;
+                         const isActive = loadingStage === stepNum;
+                         const isCompleted = loadingStage > stepNum;
+                         const isPending = loadingStage < stepNum;
+                         
+                         return (
+                             <div key={index} className={`flex items-center gap-4 transition-all duration-500 ${isPending ? 'opacity-20 translate-x-4' : 'opacity-100 translate-x-0'}`}>
+                                 <div className={`
+                                     w-6 h-6 rounded-full flex items-center justify-center border transition-all duration-500 shadow-[0_0_10px_rgba(0,0,0,0.5)]
+                                     ${isCompleted ? 'bg-green-500 border-green-500 text-black scale-100' : 
+                                       isActive ? 'bg-cyan-500 border-cyan-400 text-black scale-110 shadow-[0_0_15px_rgba(34,211,238,0.6)]' : 
+                                       'border-white/10 bg-transparent text-transparent scale-90'}
+                                 `}>
+                                     {isCompleted ? <CheckCircle size={14} /> : 
+                                      isActive ? <Loader2 size={14} className="animate-spin" /> : 
+                                      <div className="w-1.5 h-1.5 rounded-full bg-white/20" />}
+                                 </div>
+                                 <div className="flex-1">
+                                     <span className={`font-medium text-sm tracking-wide transition-colors duration-300 ${isActive ? 'text-cyan-300' : isCompleted ? 'text-green-300' : 'text-white'}`}>
+                                         {step.label}
+                                     </span>
+                                     {isActive && (
+                                         <div className="h-0.5 bg-cyan-500/30 w-full mt-1 rounded-full overflow-hidden">
+                                             <div className="h-full bg-cyan-400 animate-[progress_1s_ease-in-out_infinite] w-1/2"></div>
+                                         </div>
+                                     )}
+                                 </div>
+                             </div>
+                         );
+                     })}
+                 </div>
+
+                 {/* Fact Footer */}
+                 <div className="mt-12 text-center px-6 max-w-sm">
+                     <div className="inline-flex items-center gap-2 mb-3 px-3 py-1 rounded-full bg-white/5 border border-white/10">
+                        <Sparkles size={12} className="text-yellow-400" />
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-white/50">Science Fact</span>
+                     </div>
+                     <p className="text-sm font-medium text-white/80 italic leading-relaxed animate-in fade-in slide-in-from-bottom-2 duration-700 key={currentFact}">
+                        "{currentFact}"
+                     </p>
+                 </div>
+             </div>
         </div>
      );
   }
@@ -474,58 +452,124 @@ const App: React.FC = () => {
     );
   }
 
+  // --- SETTINGS MODAL ---
+  const SettingsModal = () => (
+      <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in zoom-in duration-200">
+          <div className="glass-panel w-full max-w-lg p-6 rounded-2xl flex flex-col max-h-[90vh]">
+              <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
+                  <h2 className="text-2xl font-bold flex items-center gap-2"><Settings className="text-cyan-400" /> Settings</h2>
+                  <button onClick={() => setIsSettingsOpen(false)} className="hover:text-red-400"><X /></button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto custom-scrollbar space-y-6 pr-2">
+                  {/* Public Profile Section */}
+                  <div className="space-y-4">
+                      <h3 className="text-sm font-bold uppercase tracking-widest opacity-50 flex items-center gap-2"><User size={14}/> Public Profile</h3>
+                      
+                      <div className="flex items-center gap-4">
+                          <div className="w-20 h-20 rounded-full bg-white/10 border border-white/20 overflow-hidden flex items-center justify-center shrink-0 relative group">
+                              {settingsAvatar ? <img src={settingsAvatar} alt="Profile" className="w-full h-full object-cover" /> : <User size={40} className="opacity-50" />}
+                              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer">
+                                  {uploadingAvatar ? <Loader2 className="animate-spin text-white"/> : <Upload className="text-white"/>}
+                              </div>
+                              <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" accept="image/*" onChange={handleAvatarUpload} disabled={uploadingAvatar} />
+                          </div>
+                          <div className="flex-1">
+                              <label className="text-xs font-bold mb-2 block">CHANGE PROFILE PICTURE</label>
+                              <div className="flex gap-2">
+                                  <label className="glass-button px-4 py-3 w-full rounded-xl flex items-center justify-center gap-2 cursor-pointer hover:bg-white/20 transition-all font-bold text-sm bg-white/5 border border-white/10">
+                                      <ImageIcon size={18} />
+                                      {uploadingAvatar ? 'Uploading...' : 'Upload Image'}
+                                      <input type="file" className="hidden" accept="image/*" onChange={handleAvatarUpload} disabled={uploadingAvatar} />
+                                  </label>
+                              </div>
+                              <p className="text-[10px] opacity-40 mt-2">Recommended: Square JPG/PNG, max 2MB.</p>
+                          </div>
+                      </div>
+
+                      <div>
+                          <label className="text-xs font-bold mb-1 block">DISPLAY NAME (Optional)</label>
+                          <input 
+                              className="w-full bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-sm focus:border-cyan-400 outline-none" 
+                              placeholder={`Defaults to @${user.username}`}
+                              value={settingsName}
+                              onChange={(e) => setSettingsName(e.target.value)}
+                          />
+                          <p className="text-[10px] opacity-40 mt-1">Used in Leaderboard and Community Notes.</p>
+                      </div>
+                  </div>
+
+                  {/* UI Customization Section */}
+                  <div className="space-y-4">
+                      <h3 className="text-sm font-bold uppercase tracking-widest opacity-50 flex items-center gap-2"><Palette size={14}/> Interface Theme</h3>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {Object.entries(THEMES).map(([key, theme]) => (
+                              <button 
+                                  key={key}
+                                  onClick={() => setSettingsTheme(key)}
+                                  className={`p-3 rounded-xl border text-left transition-all relative overflow-hidden group ${settingsTheme === key ? 'border-cyan-400 bg-white/10' : 'border-white/10 hover:bg-white/5'}`}
+                              >
+                                  <div className="absolute inset-0 opacity-30" style={{background: theme.gradient}}></div>
+                                  <div className="relative z-10 flex justify-between items-center">
+                                      <span className="font-bold text-sm">{theme.name}</span>
+                                      {settingsTheme === key && <CheckCircle size={16} className="text-cyan-400" />}
+                                  </div>
+                              </button>
+                          ))}
+                      </div>
+                  </div>
+              </div>
+
+              <div className="pt-6 mt-2 border-t border-white/10 flex justify-end gap-3">
+                  <button onClick={() => setIsSettingsOpen(false)} className="px-4 py-2 rounded-lg hover:bg-white/10">Cancel</button>
+                  <button 
+                      onClick={handleSaveSettings}
+                      disabled={isSavingSettings}
+                      className="px-6 py-2 rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 font-bold flex items-center gap-2 shadow-lg text-white"
+                  >
+                      {isSavingSettings ? <Loader2 className="animate-spin" size={16} /> : <CheckCircle size={16} />}
+                      Save Changes
+                  </button>
+              </div>
+          </div>
+      </div>
+  );
+
   return (
-    <div className="flex h-[100dvh] w-screen overflow-hidden font-sans text-white p-2 md:p-6 gap-6 relative bg-transparent">
+    <div className={`flex h-[100dvh] w-screen overflow-hidden font-sans p-2 md:p-6 gap-6 relative bg-transparent transition-colors duration-500`}>
       
       <ToastContainer />
       
-      {/* Feedback Modal */}
+      {/* Modals */}
+      {isSettingsOpen && <SettingsModal />}
+      
       {isFeedbackOpen && (
         <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="glass-panel w-full max-w-md p-6 rounded-2xl bg-[#1a1a2e] animate-in zoom-in duration-200 shadow-2xl border-white/20">
+            <div className="glass-panel w-full max-w-md p-6 rounded-2xl animate-in zoom-in duration-200 border-white/20">
                 <div className="flex justify-between items-start mb-4">
-                    <div>
-                        <h3 className="text-xl font-bold flex items-center gap-2 text-white">
-                            <AlertTriangle className="text-yellow-400" size={20} /> Report an Issue
-                        </h3>
-                        <p className="text-sm text-white/60 mt-1">
-                            Found a bug? Let Akshaj know!
-                        </p>
-                    </div>
-                    <button onClick={() => setIsFeedbackOpen(false)} className="hover:text-red-400 transition-colors"><X size={20}/></button>
+                    <h3 className="text-xl font-bold flex items-center gap-2"><AlertTriangle className="text-yellow-400" size={20} /> Report Issue</h3>
+                    <button onClick={() => setIsFeedbackOpen(false)} className="hover:text-red-400"><X size={20}/></button>
                 </div>
-                
                 <form onSubmit={handleSendFeedback}>
                     <input
-                        type="text"
-                        value={feedbackName}
-                        onChange={(e) => setFeedbackName(e.target.value)}
-                        className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 mb-3 text-sm focus:border-cyan-400 outline-none text-white placeholder-white/30 transition-all focus:ring-1 focus:ring-cyan-400/50"
-                        placeholder="Your Name"
-                        required
+                        type="email"
+                        value={feedbackEmail}
+                        onChange={(e) => setFeedbackEmail(e.target.value)}
+                        className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 mb-3 text-sm focus:border-cyan-400 outline-none"
+                        placeholder="Email Address (Optional)"
                     />
                     <textarea
                         value={feedbackText}
                         onChange={(e) => setFeedbackText(e.target.value)}
-                        className="w-full h-32 bg-black/30 border border-white/10 rounded-xl p-3 text-sm focus:border-cyan-400 outline-none resize-none mb-4 custom-scrollbar text-white placeholder-white/30 transition-all focus:ring-1 focus:ring-cyan-400/50"
-                        placeholder="Describe the problem you are facing..."
+                        className="w-full h-32 bg-white/10 border border-white/10 rounded-xl p-3 text-sm focus:border-cyan-400 outline-none resize-none mb-4"
+                        placeholder="Describe the problem..."
                         required
                     />
                     <div className="flex gap-2 justify-end">
-                        <button 
-                            type="button"
-                            onClick={() => setIsFeedbackOpen(false)}
-                            className="px-4 py-2 rounded-lg text-sm hover:bg-white/10 transition-colors"
-                        >
-                            Cancel
-                        </button>
-                        <button 
-                            type="submit"
-                            disabled={isSendingFeedback}
-                            className="px-4 py-2 rounded-lg text-sm bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold flex items-center gap-2 shadow-lg active:scale-95 transition-all disabled:opacity-50"
-                        >
-                            {isSendingFeedback ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                            {isSendingFeedback ? 'Sending...' : 'Send Report'}
+                        <button type="button" onClick={() => setIsFeedbackOpen(false)} className="px-4 py-2 rounded-lg text-sm hover:bg-white/10">Cancel</button>
+                        <button type="submit" disabled={isSendingFeedback} className="px-4 py-2 rounded-lg text-sm bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-bold flex items-center gap-2">
+                            {isSendingFeedback ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Send Report
                         </button>
                     </div>
                 </form>
@@ -533,13 +577,15 @@ const App: React.FC = () => {
         </div>
       )}
       
+      {/* Mobile Menu Button */}
       <button 
-        className="md:hidden absolute top-4 left-4 z-50 p-2 glass-button rounded-lg bg-black/40 border-white/20 active:scale-95 transition-transform"
+        className={`md:hidden absolute top-4 left-4 z-50 p-2 glass-button rounded-lg`}
         onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
       >
         {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
       </button>
 
+      {/* Navigation Sidebar */}
       <div 
         className={`fixed inset-0 bg-black/80 backdrop-blur-sm z-40 transition-opacity duration-300 md:hidden ${mobileMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
         onClick={() => setMobileMenuOpen(false)}
@@ -551,25 +597,20 @@ const App: React.FC = () => {
         ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-[120%]'}
       `}>
         <div className="mb-8 p-2 text-center mt-12 md:mt-0">
-          <div className="inline-flex p-3 rounded-full bg-cyan-500/10 mb-3 border border-cyan-500/20">
-             <Atom size={32} className="text-cyan-300 animate-[spin_10s_linear_infinite]" />
+          <div className="inline-flex p-3 rounded-full bg-white/5 mb-3 border border-white/10">
+             <Atom size={32} className="text-cyan-400 animate-[spin_10s_linear_infinite]" />
           </div>
-          <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-300 to-purple-300">
-            Science Buddy
-          </h1>
-          <p className="text-[10px] text-white/50 tracking-[0.2em] uppercase mt-1">Class 8 Revision</p>
+          <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-purple-400">Science Buddy</h1>
           
-          {user.username && (
-             <div className="mt-4 text-sm text-cyan-200 bg-white/10 rounded-lg py-2 px-3 inline-block border border-white/10 w-full truncate mb-2">
-                Hi, {user.username}!
-             </div>
-          )}
-          
-          <div className="flex items-center justify-center gap-2 text-yellow-300 font-bold bg-yellow-500/10 py-2 px-3 rounded-lg border border-yellow-500/20 w-full animate-in zoom-in duration-300">
-            <Trophy size={16} />
-            <span>{user.total_points || 0} pts</span>
+          <div className="mt-4 flex flex-col items-center">
+              <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-white/20 mb-2">
+                  {user.avatar_url ? <img src={user.avatar_url} className="w-full h-full object-cover"/> : <User size={32} className="w-full h-full p-3 bg-white/10"/>}
+              </div>
+              <div className="text-sm font-bold truncate max-w-[150px]">{user.display_name || user.username}</div>
+              <div className="flex items-center justify-center gap-1 text-yellow-400 font-bold text-xs mt-1">
+                <Trophy size={12} /> {user.total_points || 0} pts
+              </div>
           </div>
-          <p className="text-[9px] text-white/30 mt-1 uppercase tracking-wide">Total Score</p>
         </div>
 
         <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2">
@@ -588,31 +629,48 @@ const App: React.FC = () => {
                 className={`
                   w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all border active:scale-95
                   ${isActive 
-                    ? 'bg-gradient-to-r from-purple-500/30 to-blue-500/30 border-white/30 font-bold text-white shadow-lg' 
-                    : 'bg-transparent border-transparent hover:bg-white/5 text-white/70 hover:text-white'}
+                    ? 'bg-white/10 border-white/20 font-bold shadow-lg' 
+                    : 'bg-transparent border-transparent hover:bg-white/5 opacity-70 hover:opacity-100'}
                 `}
               >
-                <Icon size={20} className={isActive ? 'text-cyan-300' : ''} />
+                <Icon size={20} className={isActive ? 'text-cyan-400' : ''} />
                 <span>{item.label}</span>
               </button>
             );
           })}
         </div>
         
-        <button 
-            onClick={handleLogout}
-            className="mt-4 w-full flex items-center justify-center gap-2 py-3 rounded-xl hover:bg-red-500/20 text-white/60 hover:text-white transition-all text-sm active:scale-95"
-        >
-            <LogOut size={16} /> Logout
-        </button>
-
-        <div className="mt-4 p-4 glass-panel rounded-xl bg-black/40 border-white/5 text-center">
-           <p className="text-[10px] text-white/40">Made By Akshaj</p>
+        <div className="mt-auto pt-4">
+            <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl hover:bg-red-500/20 opacity-60 hover:opacity-100 transition-all text-sm mb-4">
+                <LogOut size={16} /> Logout
+            </button>
+            <div className="text-center p-4 border-t border-white/5">
+                <p className="text-xs text-white/40 uppercase tracking-widest mb-1">Developed By</p>
+                <h3 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-purple-400">Akshaj</h3>
+            </div>
         </div>
       </nav>
 
-      <main className="flex-1 glass-panel rounded-2xl overflow-hidden relative z-10 h-full w-full flex flex-col shadow-2xl border-white/10">
-         <div className="h-14 md:h-0 shrink-0 bg-gradient-to-b from-black/20 to-transparent md:hidden"></div>
+      <main className={`flex-1 glass-panel rounded-2xl overflow-hidden relative z-10 h-full w-full flex flex-col shadow-2xl`}>
+         {/* TOP HEADER BAR */}
+         <div className="h-16 shrink-0 flex items-center justify-end px-6 gap-4 border-b border-white/5 bg-black/5">
+              {/* Add Top Buttons */}
+              <button 
+                  onClick={() => setIsFeedbackOpen(true)}
+                  className="p-2 rounded-full hover:bg-white/10 transition-colors opacity-70 hover:opacity-100"
+                  title="Report Issue"
+              >
+                  <AlertTriangle size={20} />
+              </button>
+              <button 
+                  onClick={() => setIsSettingsOpen(true)}
+                  className="p-2 rounded-full hover:bg-white/10 transition-colors opacity-70 hover:opacity-100"
+                  title="Settings"
+              >
+                  <Settings size={20} />
+              </button>
+         </div>
+
          <div className="flex-1 overflow-hidden relative">
             {renderContent()}
          </div>

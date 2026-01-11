@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../services/supabaseClient';
-import { Upload, FileText, Loader2, Play, Headphones, Network, Zap, Download, Trash2, Pause, ChevronLeft, MessageSquare, Send } from 'lucide-react';
+import { Upload, FileText, Loader2, Play, Headphones, Network, Zap, Download, Trash2, Pause, ChevronLeft, MessageSquare, Send, CheckCircle, XCircle } from 'lucide-react';
 import { generateResearchTitle, generateSummaryFromText, generateQuizFromText, generateInfographicFromText, generatePodcastScriptFromText, chatWithResearchDocument } from '../services/aiService';
 import { ResearchProject, ChatMessage } from '../types';
 import { ConceptMap } from './CreativeTools';
@@ -32,6 +32,11 @@ const ResearchMode: React.FC<ResearchModeProps> = ({ userId, username }) => {
     const [chatLoading, setChatLoading] = useState(false);
     const chatEndRef = useRef<HTMLDivElement>(null);
 
+    // Quiz State
+    const [quizAnswers, setQuizAnswers] = useState<Record<number, string>>({});
+    const [showQuizResults, setShowQuizResults] = useState(false);
+    const [quizScore, setQuizScore] = useState(0);
+
     useEffect(() => {
         fetchResearches();
         return () => { speechManager.stop(); };
@@ -41,7 +46,19 @@ const ResearchMode: React.FC<ResearchModeProps> = ({ userId, username }) => {
         if (activeTab === 'CHAT') {
             chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
         }
+        // Reset quiz state when switching projects or tabs
+        if (activeTab !== 'QUIZ') {
+             // Optional: keep state if they switch back? For now, simple reset if project changes
+        }
     }, [activeTab, currentProject?.chat_history, chatLoading]);
+
+    useEffect(() => {
+        if (currentProject) {
+            setQuizAnswers({});
+            setShowQuizResults(false);
+            setQuizScore(0);
+        }
+    }, [currentProject?.id]);
 
     const fetchResearches = async () => {
         const { data } = await supabase
@@ -151,7 +168,7 @@ const ResearchMode: React.FC<ResearchModeProps> = ({ userId, username }) => {
              pitch = 1.1;
         } else {
              voice = speechManager.getMaleVoice();
-             rate = 0.95; // Fixed: Rohan back to 0.95
+             rate = 0.95; 
              pitch = 0.9;
         }
 
@@ -170,14 +187,12 @@ const ResearchMode: React.FC<ResearchModeProps> = ({ userId, username }) => {
             speechManager.pause();
             setIsPlaying(false);
         } else {
-            // Check if we are paused to resume, or if we need to start fresh
             if (window.speechSynthesis.paused) {
                 speechManager.resume();
             } else {
                 if (currentLine === -1) {
                     setCurrentLine(0);
                 } else {
-                    // Force start if we weren't paused (e.g. stopped)
                     speakSegment(currentLine);
                 }
             }
@@ -185,12 +200,11 @@ const ResearchMode: React.FC<ResearchModeProps> = ({ userId, username }) => {
         }
     };
 
-    // Effect triggers only when line changes, and only if we are in playing state
     useEffect(() => {
         if (isPlaying && currentLine >= 0) {
             speakSegment(currentLine);
         }
-    }, [currentLine]); // removed isPlaying to prevent restart on resume
+    }, [currentLine]);
 
     // Other Tabs
     const handleGenerateSummary = async () => { if (!currentProject) return; setIsGenerating(true); const summary = await generateSummaryFromText(currentProject.source_text); await updateProjectInDb({ summary }); setIsGenerating(false); };
@@ -208,6 +222,21 @@ const ResearchMode: React.FC<ResearchModeProps> = ({ userId, username }) => {
             await updateProjectInDb({ chat_history: [...newHistory, aiMsg] });
         } catch(e) {}
         setChatLoading(false);
+    };
+
+    const handleQuizAnswer = (index: number, option: string) => {
+        if (showQuizResults) return;
+        setQuizAnswers(prev => ({ ...prev, [index]: option }));
+    };
+
+    const submitQuiz = () => {
+        if (!currentProject?.quiz_data) return;
+        let score = 0;
+        currentProject.quiz_data.forEach((q, i) => {
+            if (quizAnswers[i] === q.correctAnswer) score++;
+        });
+        setQuizScore(score);
+        setShowQuizResults(true);
     };
 
     const handleDeleteProject = async (e: React.MouseEvent, id: string) => {
@@ -262,6 +291,80 @@ const ResearchMode: React.FC<ResearchModeProps> = ({ userId, username }) => {
                         <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4">{currentProject?.chat_history?.map(msg => <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : ''}`}><div className={`max-w-[85%] rounded-2xl p-4 ${msg.role === 'user' ? 'bg-cyan-900/40 border-cyan-500/30' : 'bg-white/10'}`}>{renderRichText(msg.text)}</div></div>)}<div ref={chatEndRef} /></div>
                         <div className="p-4 bg-black/20 border-t border-white/10 flex gap-2"><input value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleChatSend()} className="flex-1 bg-white/10 border border-white/10 rounded-xl px-4 py-3" placeholder="Ask about the note..." /><button onClick={handleChatSend} className="p-3 bg-cyan-600 rounded-xl"><Send size={20}/></button></div>
                     </div>
+                )}
+
+                {activeTab === 'QUIZ' && (
+                    !currentProject?.quiz_data ? (
+                        <div className="flex-1 flex flex-col items-center justify-center opacity-50">
+                            <Zap size={64} className="mb-4"/>
+                            <button onClick={handleGenerateQuiz} className="glass-button px-8 py-3 rounded-full font-bold">Generate Quiz</button>
+                        </div>
+                    ) : (
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-8">
+                             {showQuizResults && (
+                                <div className="mb-8 p-6 bg-green-500/20 border border-green-500 rounded-2xl text-center">
+                                    <h3 className="text-2xl font-bold mb-2">Quiz Results</h3>
+                                    <p className="text-lg">You scored <span className="text-green-400 font-bold">{quizScore}</span> out of {currentProject.quiz_data.length}</p>
+                                </div>
+                            )}
+                            
+                            <div className="space-y-8">
+                                {currentProject.quiz_data.map((q, i) => {
+                                    const userAnswer = quizAnswers[i];
+                                    const isCorrect = userAnswer === q.correctAnswer;
+                                    
+                                    return (
+                                        <div key={i} className="p-6 glass-panel rounded-xl">
+                                            <p className="font-bold text-lg mb-4 flex gap-2">
+                                                <span className="text-white/50">{i+1}.</span> {q.question}
+                                            </p>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                {q.options.map((opt, idx) => {
+                                                    let className = "p-3 rounded-lg border text-left transition-all ";
+                                                    
+                                                    if (showQuizResults) {
+                                                        if (opt === q.correctAnswer) className += "bg-green-500/30 border-green-500 text-white";
+                                                        else if (opt === userAnswer && !isCorrect) className += "bg-red-500/30 border-red-500 text-white";
+                                                        else className += "border-white/10 opacity-50";
+                                                    } else {
+                                                        className += userAnswer === opt ? "bg-cyan-500/30 border-cyan-500" : "border-white/10 hover:bg-white/5";
+                                                    }
+
+                                                    return (
+                                                        <button 
+                                                            key={idx}
+                                                            disabled={showQuizResults}
+                                                            onClick={() => handleQuizAnswer(i, opt)}
+                                                            className={className}
+                                                        >
+                                                            {opt}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                            {showQuizResults && (
+                                                <div className="mt-4 text-sm text-white/60 p-3 bg-white/5 rounded-lg">
+                                                    <strong className="text-cyan-400">Explanation:</strong> {q.explanation}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {!showQuizResults && (
+                                <div className="mt-8 flex justify-center">
+                                    <button 
+                                        onClick={submitQuiz}
+                                        disabled={Object.keys(quizAnswers).length < currentProject.quiz_data.length}
+                                        className="glass-button px-8 py-3 rounded-full font-bold bg-green-600/20 hover:bg-green-600/40 text-green-100 disabled:opacity-50"
+                                    >
+                                        Submit Answers
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )
                 )}
 
                 {activeTab === 'GRAPH' && (

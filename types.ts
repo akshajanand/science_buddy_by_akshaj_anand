@@ -118,6 +118,8 @@ export interface CommunityNote {
     id: string;
     user_id: string;
     username: string;
+    display_name?: string;
+    avatar_url?: string;
     title: string;
     content: string;
     file_type: string;

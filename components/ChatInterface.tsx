@@ -18,12 +18,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userProfile, onUpdateProf
   const [currentSessionId, setCurrentSessionId] = useState<string | null>('new');
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
+  // Settings removed from here, moved to App.tsx
   const [showHistoryMobile, setShowHistoryMobile] = useState(false);
-  
-  // Settings Form State
-  const [tempName, setTempName] = useState(userProfile.name || '');
-  const [tempInterests, setTempInterests] = useState(userProfile.interests || '');
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -58,21 +54,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userProfile, onUpdateProf
   }, [userId, initialSessionId]);
 
   useEffect(() => {
-    setTempName(userProfile.name || '');
-    setTempInterests(userProfile.interests || '');
-  }, [userProfile]);
-
-  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [sessions, currentSessionId, loading]);
-
-  const saveSettings = () => {
-    onUpdateProfile({
-        name: tempName,
-        interests: tempInterests
-    });
-    setShowSettings(false);
-  };
 
   const createNewSession = () => {
     // Just switch to draft mode. Do not create data yet.
@@ -267,67 +250,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userProfile, onUpdateProf
           ))}
         </div>
         
-        <button 
-            onClick={() => {
-                setShowSettings(true);
-                setShowHistoryMobile(false);
-            }}
-            className="mt-4 p-3 rounded-xl flex items-center gap-3 hover:bg-white/10 transition-colors text-white/70 hover:text-white border-t border-white/10"
-        >
-            <Settings size={18} />
-            <span>Personalize</span>
-        </button>
+        {/* Personalize Button Removed Here */}
       </>
   );
 
   return (
     <div className="flex h-full gap-4 relative">
-        
-      {/* Settings Modal */}
-      {showSettings && (
-        <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-            <div className="glass-panel w-full max-w-md p-6 rounded-2xl bg-[#1a1a2e] border border-white/20 shadow-2xl animate-in fade-in zoom-in duration-200">
-                <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-2xl font-bold flex items-center gap-2">
-                        <Settings className="text-purple-400" /> Personalize
-                    </h2>
-                    <button onClick={() => setShowSettings(false)} className="hover:text-red-400 transition-colors">
-                        <X />
-                    </button>
-                </div>
-                
-                <div className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-bold text-white/70 mb-2 uppercase tracking-wider">Your Name</label>
-                        <input 
-                            value={tempName}
-                            onChange={(e) => setTempName(e.target.value)}
-                            className="w-full bg-black/30 border border-white/10 rounded-xl p-3 focus:outline-none focus:border-purple-500 transition-colors"
-                            placeholder="What should I call you?"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-bold text-white/70 mb-2 uppercase tracking-wider">Interests & Context</label>
-                        <textarea 
-                            value={tempInterests}
-                            onChange={(e) => setTempInterests(e.target.value)}
-                            className="w-full h-32 bg-black/30 border border-white/10 rounded-xl p-3 focus:outline-none focus:border-purple-500 transition-colors resize-none"
-                            placeholder="e.g. I love space but hate biology. I learn best with car analogies."
-                        />
-                        <p className="text-xs text-white/40 mt-2">The AI will use this to tailor every answer to you.</p>
-                    </div>
-
-                    <button 
-                        onClick={saveSettings}
-                        className="w-full glass-button bg-gradient-to-r from-purple-600 to-blue-600 border-none hover:opacity-90 py-3 rounded-xl font-bold flex justify-center items-center gap-2 mt-4"
-                    >
-                        <Save size={18} /> Save Profile
-                    </button>
-                </div>
-            </div>
-        </div>
-      )}
-
       {/* Desktop Sidebar */}
       <div className="w-1/4 glass-panel rounded-2xl flex-col p-4 hidden md:flex">
         <SidebarContent />
@@ -371,7 +299,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userProfile, onUpdateProf
                       <Sparkles size={48} className="text-cyan-300" />
                   </div>
                   <h2 className="text-2xl font-bold mb-2">Hello, {userProfile.name || 'Science Explorer'}!</h2>
-                  <p className="text-white/60 max-w-md text-center">
+                  <p className="max-w-md text-center opacity-60">
                       I'm ready to help you ace Class 8 Science. Ask me anything to start a new session!
                   </p>
               </div>
@@ -383,7 +311,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userProfile, onUpdateProf
               <div className={`max-w-[85%] md:max-w-[75%] rounded-2xl p-4 shadow-lg transition-all relative group ${
                 msg.role === 'user' 
                   ? 'bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-tr-none' 
-                  : 'bg-[#1e1e2f] border border-white/10 text-white rounded-tl-none'
+                  : 'bg-[#1e1e2f] border border-white/10 rounded-tl-none' // Removed text-white to allow theme inherit
               }`}>
                 <div className="flex items-center gap-2 mb-1 opacity-70 text-[10px] font-bold uppercase tracking-wider">
                   {msg.role === 'user' ? <User size={10} /> : <Bot size={10} />}
