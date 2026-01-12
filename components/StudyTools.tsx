@@ -1,10 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, CheckCircle, Brain, Volume2, Search, StopCircle, Atom, Puzzle, RefreshCw, Gauge, Podcast, Radio, Trophy, Play, Pause, Download, RotateCcw, List, Save, Trash2, Library, X, Loader2, Headphones, Zap, ArrowRight, ArrowLeft, Grid } from 'lucide-react';
+import { Mic, CheckCircle, Brain, Volume2, Search, StopCircle, Atom, Puzzle, RefreshCw, Gauge, Podcast, Radio, Trophy, Play, Pause, Download, RotateCcw, List, Save, Trash2, Library, X, Loader2, Headphones, Zap, ArrowRight, ArrowLeft, Grid, XCircle } from 'lucide-react';
 import { generateQuizQuestions, generateWordPuzzle, generateStudyPodSummary, generateMatchingPairs, generatePodcastScript } from '../services/aiService';
 import { QuizQuestion, PuzzleWord, MatchCard, PodcastSegment, StudyItem } from '../types';
 import { speechManager } from '../utils/audioUtils';
 import { supabase } from '../services/supabaseClient';
 import { showToast } from '../utils/notificationUtils';
+
+// Helper for AI XP Reward
+const awardXP = async (userId: string, amount: number, activity: string) => {
+    try {
+        await supabase.rpc('increment_score', { row_id: userId, points: amount });
+        showToast(`AI Reward: +${amount} XP for ${activity}! 🌟`, 'success');
+    } catch (e) {
+        console.error("XP Error", e);
+    }
+};
 
 // --- Mind Match Component ---
 export const MindMatch: React.FC = () => {
@@ -14,6 +24,13 @@ export const MindMatch: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [matches, setMatches] = useState(0);
     const [errorId, setErrorId] = useState<string | null>(null);
+    const [userId, setUserId] = useState<string | null>(null);
+
+    useEffect(() => {
+        // Quick fetch of user ID for XP
+        const userStr = localStorage.getItem('science_buddy_user');
+        if (userStr) setUserId(JSON.parse(userStr).id);
+    }, []);
 
     const handleStart = async () => {
         if (!topic) return;
@@ -48,7 +65,14 @@ export const MindMatch: React.FC = () => {
         }
         if (selectedCard.id === card.id) {
             setCards(prev => prev.map(c => c.id === card.id ? { ...c, isMatched: true } : c));
-            setMatches(m => m + 1);
+            setMatches(m => {
+                const newM = m + 1;
+                // Game Over Check
+                if (newM === cards.length / 2) {
+                     if (userId) awardXP(userId, 50, "Completing Mind Match");
+                }
+                return newM;
+            });
             setSelectedCard(null);
         } else {
             setErrorId(card.id);
@@ -57,9 +81,9 @@ export const MindMatch: React.FC = () => {
     };
 
     if (!cards.length && !loading) return (
-        <div className="flex flex-col items-center justify-center h-full p-6 text-center">
+        <div className="flex flex-col items-center justify-center h-full p-6 text-center animate-in fade-in zoom-in">
             <Puzzle size={64} className="mb-4 text-green-300" /><h2 className="text-3xl font-bold mb-4">Mind Match</h2>
-            <div className="relative w-full max-w-md"><input className="w-full bg-white/10 rounded-full px-6 py-4 border border-white/20 outline-none focus:border-green-400" placeholder="Topic (e.g. Gravity)" value={topic} onChange={(e) => setTopic(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleStart()} /><button onClick={handleStart} className="absolute right-2 top-2 bottom-2 glass-button px-6 rounded-full active:scale-95 transition-transform bg-green-500/20 hover:bg-green-500/40 font-bold">Start</button></div>
+            <div className="relative w-full max-w-md"><input className="w-full bg-white/10 rounded-full px-6 py-4 border border-white/20 outline-none focus:border-green-400 transition-colors" placeholder="Topic (e.g. Gravity)" value={topic} onChange={(e) => setTopic(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleStart()} /><button onClick={handleStart} className="absolute right-2 top-2 bottom-2 glass-button px-6 rounded-full active:scale-95 transition-transform bg-green-500/20 hover:bg-green-500/40 font-bold">Start</button></div>
         </div>
     )
 
@@ -68,7 +92,7 @@ export const MindMatch: React.FC = () => {
     return (
         <div className="h-full flex flex-col p-6 overflow-hidden">
              <div className="flex justify-between items-center mb-6"><h2 className="text-2xl font-bold">{topic}</h2><button onClick={() => setCards([])}><RefreshCw/></button></div>
-             {matches === cards.length / 2 ? <div className="flex-1 flex flex-col items-center justify-center"><h1 className="text-5xl font-bold text-green-300 animate-bounce">Done!</h1><button onClick={() => setCards([])} className="mt-4 glass-button px-6 py-3 rounded-full font-bold">Play Another</button></div> : 
+             {matches === cards.length / 2 ? <div className="flex-1 flex flex-col items-center justify-center animate-in zoom-in"><h1 className="text-5xl font-bold text-green-300 animate-bounce">Done!</h1><button onClick={() => setCards([])} className="mt-4 glass-button px-6 py-3 rounded-full font-bold">Play Another</button></div> : 
              <div className="flex-1 overflow-y-auto custom-scrollbar"><div className="grid grid-cols-2 md:grid-cols-4 gap-4 pb-10">{cards.map((card, idx) => <button key={idx} onClick={() => handleCardClick(card)} className={`glass-button p-4 rounded-xl min-h-[120px] flex items-center justify-center text-center transition-all active:scale-95 text-sm md:text-base font-medium ${card.isMatched ? 'opacity-20 bg-green-500' : selectedCard === card ? 'bg-yellow-500/30 border-yellow-400 scale-105' : errorId === card.id && selectedCard ? 'bg-red-500/30 animate-pulse border-red-500' : 'bg-white/5 hover:bg-white/10'}`}>{card.text}</button>)}</div></div>}
         </div>
     );
@@ -124,6 +148,8 @@ export const StudyPod: React.FC<StudyPodProps> = ({ userId }) => {
         if (!error && data) {
             setSavedItems(prev => [data, ...prev]);
             showToast("Saved to Library!", 'success');
+            // Award XP
+            awardXP(userId, 10, "Saving Study Pod");
         } else {
             console.error(error);
             showToast("Failed to save: " + error.message, 'error');
@@ -154,6 +180,8 @@ export const StudyPod: React.FC<StudyPodProps> = ({ userId }) => {
             setCurrentPodcastLine(0);
             setPlaying(true);
         }
+        
+        if (userId) awardXP(userId, 15, "Generating Study Pod");
         setLoading(false);
     };
 
@@ -301,19 +329,19 @@ export const StudyPod: React.FC<StudyPodProps> = ({ userId }) => {
             </div>
 
             <div className="flex bg-white/10 p-1 rounded-xl mb-6 w-full max-w-sm">
-                <button onClick={() => setMode('SUMMARY')} className={`flex-1 py-2 rounded-lg text-sm font-bold ${mode === 'SUMMARY' ? 'bg-cyan-500 text-white' : 'text-white/50'}`}>Summary</button>
-                <button onClick={() => setMode('PODCAST')} className={`flex-1 py-2 rounded-lg text-sm font-bold ${mode === 'PODCAST' ? 'bg-purple-500 text-white' : 'text-white/50'}`}>Podcast</button>
+                <button onClick={() => setMode('SUMMARY')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${mode === 'SUMMARY' ? 'bg-cyan-500 text-white' : 'text-white/50'}`}>Summary</button>
+                <button onClick={() => setMode('PODCAST')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${mode === 'PODCAST' ? 'bg-purple-500 text-white' : 'text-white/50'}`}>Podcast</button>
             </div>
             
             <div className="flex gap-2 w-full max-w-2xl mb-6">
-                <input className="flex-1 bg-white/10 rounded-xl px-4 py-3 border border-white/10 focus:border-cyan-400 outline-none" placeholder={mode === 'SUMMARY' ? "Enter topic for Summary..." : "Enter topic for Podcast..."} value={topic} onChange={e => setTopic(e.target.value)} />
+                <input className="flex-1 bg-white/10 rounded-xl px-4 py-3 border border-white/10 focus:border-cyan-400 outline-none transition-colors" placeholder={mode === 'SUMMARY' ? "Enter topic for Summary..." : "Enter topic for Podcast..."} value={topic} onChange={e => setTopic(e.target.value)} />
                 <button onClick={handleGenerate} disabled={loading || !topic} className="glass-button px-6 rounded-xl font-bold bg-white/10 hover:bg-white/20 active:scale-95 transition-transform">
                     {loading ? <Loader2 className="animate-spin" /> : <RefreshCw />}
                 </button>
             </div>
 
             {hasContent && (
-                 <div className="w-full max-w-3xl flex items-center justify-between bg-black/40 p-4 rounded-2xl mb-4 border border-white/10">
+                 <div className="w-full max-w-3xl flex items-center justify-between bg-black/40 p-4 rounded-2xl mb-4 border border-white/10 animate-in fade-in slide-in-from-bottom-2">
                     <div className="flex items-center gap-4">
                         <button onClick={togglePlayback} className={`w-12 h-12 rounded-full flex items-center justify-center ${playing ? 'bg-red-500' : 'bg-green-500'} text-white shadow-lg active:scale-90 transition-transform`}>
                             {playing ? <Pause fill="white"/> : <Play fill="white" className="ml-1"/>}
@@ -331,12 +359,12 @@ export const StudyPod: React.FC<StudyPodProps> = ({ userId }) => {
 
             <div className="w-full max-w-3xl glass-panel p-6 rounded-xl min-h-[300px] flex-1 overflow-y-auto custom-scrollbar">
                 {mode === 'SUMMARY' ? (
-                    summary ? <p className="leading-relaxed text-lg whitespace-pre-wrap">{summary}</p> : <div className="h-full flex items-center justify-center opacity-30">Enter a topic to generate a summary.</div>
+                    summary ? <p className="leading-relaxed text-lg whitespace-pre-wrap animate-in fade-in">{summary}</p> : <div className="h-full flex items-center justify-center opacity-30">Enter a topic to generate a summary.</div>
                 ) : (
                     podcastScript.length > 0 ? (
                         <div className="space-y-4">
                              {podcastScript.map((seg, i) => (
-                                <div key={i} className={`flex gap-4 ${seg.speaker === 'Host 2' ? 'flex-row-reverse' : ''} ${currentPodcastLine === i ? 'opacity-100 scale-[1.01] bg-white/5 rounded-xl' : 'opacity-70'} transition-all p-2`}>
+                                <div key={i} className={`flex gap-4 ${seg.speaker === 'Host 2' ? 'flex-row-reverse' : ''} ${currentPodcastLine === i ? 'opacity-100 scale-[1.01] bg-white/5 rounded-xl' : 'opacity-70'} transition-all p-2 duration-500`}>
                                      <div className={`w-10 h-10 rounded-full shrink-0 flex items-center justify-center font-bold border ${seg.speaker === 'Host 1' ? 'bg-cyan-900 border-cyan-500' : 'bg-purple-900 border-purple-500'}`}>{seg.speaker === 'Host 1' ? 'R' : 'Ro'}</div>
                                      <div className="p-2 rounded-xl flex-1 text-base">{seg.text}</div>
                                 </div>
@@ -352,6 +380,7 @@ export const StudyPod: React.FC<StudyPodProps> = ({ userId }) => {
 // --- Flash Quiz Component ---
 export const QuizModule: React.FC = () => { 
     const [topic, setTopic] = useState('');
+    const [questionCount, setQuestionCount] = useState(5);
     const [questions, setQuestions] = useState<QuizQuestion[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [score, setScore] = useState(0);
@@ -359,6 +388,12 @@ export const QuizModule: React.FC = () => {
     const [selectedOption, setSelectedOption] = useState<string | null>(null);
     const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
     const [quizComplete, setQuizComplete] = useState(false);
+    const [userId, setUserId] = useState<string | null>(null);
+
+    useEffect(() => {
+        const userStr = localStorage.getItem('science_buddy_user');
+        if (userStr) setUserId(JSON.parse(userStr).id);
+    }, []);
 
     const startQuiz = async () => {
         if (!topic) return;
@@ -369,7 +404,7 @@ export const QuizModule: React.FC = () => {
         setCurrentIndex(0);
         
         try {
-            const qs = await generateQuizQuestions(topic, 5, 'General Science');
+            const qs = await generateQuizQuestions(topic, questionCount, 'General Science');
             setQuestions(qs);
         } catch(e) { showToast("Failed to gen quiz", 'error'); }
         setLoading(false);
@@ -380,7 +415,9 @@ export const QuizModule: React.FC = () => {
         setSelectedOption(option);
         const correct = option === questions[currentIndex].correctAnswer;
         setIsCorrect(correct);
-        if (correct) setScore(s => s + 1);
+        if (correct) {
+            setScore(s => s + 1);
+        }
         
         setTimeout(() => {
             if (currentIndex + 1 < questions.length) {
@@ -389,13 +426,16 @@ export const QuizModule: React.FC = () => {
                 setIsCorrect(null);
             } else {
                 setQuizComplete(true);
+                // Award XP based on final score
+                const finalScore = isCorrect ? score + 1 : score;
+                if (userId) awardXP(userId, finalScore * 2, "Flash Quiz Performance");
             }
         }, 1500);
     };
 
     if (quizComplete) return (
-        <div className="h-full flex flex-col items-center justify-center text-center p-6">
-            <Trophy size={64} className="text-yellow-400 mb-4" />
+        <div className="h-full flex flex-col items-center justify-center text-center p-6 animate-in zoom-in">
+            <Trophy size={64} className="text-yellow-400 mb-4 drop-shadow-lg" />
             <h2 className="text-3xl font-bold mb-2">Quiz Complete!</h2>
             <p className="text-xl mb-6">You scored {score} out of {questions.length}</p>
             <button onClick={() => setQuestions([])} className="glass-button px-8 py-3 rounded-full font-bold">New Quiz</button>
@@ -403,13 +443,39 @@ export const QuizModule: React.FC = () => {
     );
 
     if (questions.length === 0) return (
-        <div className="h-full flex flex-col items-center justify-center p-6 text-center">
+        <div className="h-full flex flex-col items-center justify-center p-6 text-center animate-in fade-in">
             <Zap size={64} className="mb-4 text-yellow-300" />
             <h2 className="text-3xl font-bold mb-4">Flash Quiz</h2>
-            <p className="mb-8 opacity-60">Generate a quick 5-question test on any topic.</p>
-            <div className="relative w-full max-w-md">
-                <input className="w-full bg-white/10 rounded-full px-6 py-4 border border-white/20 outline-none focus:border-yellow-400" placeholder="Topic (e.g. Friction)" value={topic} onChange={(e) => setTopic(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && startQuiz()} />
-                <button onClick={startQuiz} disabled={loading || !topic} className="absolute right-2 top-2 bottom-2 glass-button px-6 rounded-full font-bold bg-yellow-500/20 hover:bg-yellow-500/40">{loading ? <Loader2 className="animate-spin" /> : 'Start'}</button>
+            <p className="mb-8 opacity-60">Generate a custom test on any topic.</p>
+            
+            <div className="w-full max-w-md space-y-6">
+                <div className="relative">
+                     <input className="w-full bg-white/10 rounded-full px-6 py-4 border border-white/20 outline-none focus:border-yellow-400 transition-colors" placeholder="Topic (e.g. Friction)" value={topic} onChange={(e) => setTopic(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && startQuiz()} />
+                </div>
+                
+                <div className="bg-white/5 p-4 rounded-xl border border-white/10">
+                    <label className="flex justify-between text-xs font-bold uppercase tracking-widest mb-2 opacity-70">
+                        <span>Number of Questions</span>
+                        <span>{questionCount}</span>
+                    </label>
+                    <input 
+                        type="range" 
+                        min="5" 
+                        max="30" 
+                        step="5"
+                        value={questionCount} 
+                        onChange={(e) => setQuestionCount(Number(e.target.value))}
+                        className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer accent-yellow-400"
+                    />
+                    <div className="flex justify-between text-[10px] opacity-40 mt-1">
+                        <span>5</span>
+                        <span>30</span>
+                    </div>
+                </div>
+
+                <button onClick={startQuiz} disabled={loading || !topic} className="w-full glass-button py-4 rounded-full font-bold bg-gradient-to-r from-yellow-600/50 to-orange-600/50 hover:scale-[1.02] transition-transform">
+                    {loading ? <Loader2 className="animate-spin inline mr-2" /> : 'Start Quiz'}
+                </button>
             </div>
         </div>
     );
@@ -419,29 +485,71 @@ export const QuizModule: React.FC = () => {
         <div className="h-full flex flex-col p-6 max-w-3xl mx-auto w-full">
             <div className="flex justify-between items-center mb-8">
                 <button onClick={() => setQuestions([])} className="p-2 hover:bg-white/10 rounded-full"><ArrowLeft /></button>
-                <div className="text-sm font-bold uppercase tracking-widest opacity-50">Question {currentIndex + 1}/{questions.length}</div>
-                <div className="text-yellow-300 font-bold">Score: {score}</div>
-            </div>
-            
-            <div className="glass-panel p-8 rounded-2xl mb-6 text-center text-xl font-medium min-h-[150px] flex items-center justify-center border-t-4 border-yellow-400">
-                {currentQ.question}
+                <div className="flex flex-col items-end">
+                    <span className="text-xs text-white/50 uppercase tracking-widest">Question {currentIndex + 1} / {questions.length}</span>
+                    <div className="w-32 bg-white/10 h-1.5 rounded-full mt-1">
+                        <div className="bg-cyan-400 h-full rounded-full transition-all duration-300" style={{width: `${((currentIndex + 1)/questions.length)*100}%`}}></div>
+                    </div>
+                </div>
             </div>
 
+            {/* Score Pill */}
+            <div className="self-center bg-black/20 px-4 py-1 rounded-full border border-white/5 text-sm font-mono text-yellow-300 mb-6">
+                Score: {score} pts
+            </div>
+
+            {/* Question Card */}
+            <div className="glass-panel p-6 md:p-8 rounded-2xl mb-6 min-h-[160px] flex items-center justify-center text-center shadow-2xl relative overflow-hidden animate-in fade-in slide-in-from-right-4">
+                <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-cyan-400 to-purple-500"></div>
+                <h3 className="text-xl md:text-2xl font-medium leading-relaxed">{currentQ.question}</h3>
+            </div>
+
+            {/* Options */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {currentQ.options.map((opt, i) => {
-                    let style = "glass-button p-4 rounded-xl text-left hover:bg-white/10";
+                    let btnClass = "glass-button p-5 rounded-xl text-left transition-all hover:bg-white/10 border border-white/10 relative overflow-hidden group";
+                    let icon = <div className="w-6 h-6 rounded-full border border-white/30 flex items-center justify-center text-xs group-hover:border-white/80">{String.fromCharCode(65 + i)}</div>;
+                    
                     if (selectedOption) {
-                        if (opt === currentQ.correctAnswer) style = "bg-green-500/30 border border-green-500";
-                        else if (opt === selectedOption) style = "bg-red-500/30 border border-red-500";
-                        else style = "opacity-30";
+                        if (opt === currentQ.correctAnswer) {
+                            btnClass = "bg-green-500/20 border-green-500 text-white shadow-[0_0_15px_rgba(34,197,94,0.3)]";
+                            icon = <CheckCircle size={24} className="text-green-400" />;
+                        } else if (opt === selectedOption) {
+                            btnClass = "bg-red-500/20 border-red-500 text-white opacity-80";
+                            icon = <XCircle size={24} className="text-red-400" />;
+                        } else {
+                            btnClass = "bg-black/20 opacity-30 border-transparent";
+                        }
                     }
+
                     return (
-                        <button key={i} onClick={() => handleAnswer(opt)} className={style} disabled={!!selectedOption}>
-                            <span className="opacity-50 font-bold mr-3">{String.fromCharCode(65+i)}</span> {opt}
+                        <button 
+                            key={i} 
+                            onClick={() => handleAnswer(opt)}
+                            disabled={!!selectedOption}
+                            className={btnClass}
+                        >
+                            <div className="flex items-center gap-4 relative z-10">
+                                {icon}
+                                <span className="font-medium">{opt}</span>
+                            </div>
                         </button>
                     )
                 })}
             </div>
+
+            {/* Explanation */}
+            {selectedOption && (
+                <div className="mt-6 animate-in slide-in-from-bottom-4 fade-in duration-300">
+                    <div className={`p-4 rounded-xl border ${isCorrect ? 'bg-green-900/20 border-green-500/30' : 'bg-blue-900/20 border-blue-500/30'}`}>
+                        <div className="flex items-center gap-2 mb-2 font-bold uppercase text-xs tracking-wider opacity-70">
+                            {isCorrect ? <CheckCircle size={14} /> : <ArrowRight size={14}/>}
+                            Explanation
+                        </div>
+                        <p className="text-sm md:text-base opacity-90">{currentQ.explanation}</p>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -454,6 +562,12 @@ export const WordPuzzle: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [selectedCells, setSelectedCells] = useState<{r:number, c:number}[]>([]);
     const [foundCount, setFoundCount] = useState(0);
+    const [userId, setUserId] = useState<string | null>(null);
+
+    useEffect(() => {
+        const userStr = localStorage.getItem('science_buddy_user');
+        if (userStr) setUserId(JSON.parse(userStr).id);
+    }, []);
 
     const gridSize = 10;
 
@@ -529,28 +643,24 @@ export const WordPuzzle: React.FC = () => {
         } else {
             newSelection = [...selectedCells, {r, c}];
         }
-        // Sort by position to form string easily? No, strictly selection order is tricky.
-        // Let's assume user selects in order or we just check if the set of cells matches any word.
         setSelectedCells(newSelection);
-
-        // Check Match
-        const selectedString = newSelection.map(cell => grid[cell.r][cell.c]).join('');
-        // Also check reverse? And check if cells are contiguous?
-        // Simplified: Check if constructed string matches any word.
-        // Actually, user might click out of order. Let's strictly check if the SET of selected cells corresponds to a word coordinates. 
-        // Too complex for this snippet. Let's do: User selects cells. If they form a word in any order (anagrams allowed? No).
         
-        // Strict Contiguous Check is best but hard.
-        // Lazy approach: Combine letters. If it matches a word, mark found and clear selection.
-        
-        // Let's try to find if selected string is a word (or reverse)
         const checkWord = (str: string) => {
             const foundIdx = words.findIndex(w => !w.found && w.word === str);
             if (foundIdx >= 0) {
                 const newWords = [...words];
                 newWords[foundIdx].found = true;
                 setWords(newWords);
-                setFoundCount(fc => fc + 1);
+                const newFoundCount = foundCount + 1;
+                setFoundCount(newFoundCount);
+                
+                // XP REWARD
+                if (userId) awardXP(userId, 5, "Word Found");
+                
+                if (newFoundCount === words.length && userId) {
+                    awardXP(userId, 50, "Completed Word Puzzle");
+                }
+
                 setSelectedCells([]);
                 showToast(`Found: ${str}`, 'success');
                 return true;
@@ -558,25 +668,23 @@ export const WordPuzzle: React.FC = () => {
             return false;
         };
         
-        // Construct string from selection sorted by R then C (row major)
+        // Check string combinations
         const sorted = [...newSelection].sort((a,b) => (a.r - b.r) || (a.c - b.c));
         const str = sorted.map(cell => grid[cell.r][cell.c]).join('');
         
-        // Check standard & vertical (if col matches)
         if (!checkWord(str)) {
-             // Try strict click order
              const clickStr = newSelection.map(cell => grid[cell.r][cell.c]).join('');
              checkWord(clickStr);
         }
     };
 
     if (!words.length && !loading) return (
-        <div className="h-full flex flex-col items-center justify-center p-6 text-center">
+        <div className="h-full flex flex-col items-center justify-center p-6 text-center animate-in fade-in">
             <Grid size={64} className="mb-4 text-cyan-300" />
             <h2 className="text-3xl font-bold mb-4">Word Mine</h2>
             <p className="mb-8 opacity-60">Find hidden scientific terms generated by AI.</p>
             <div className="relative w-full max-w-md">
-                <input className="w-full bg-white/10 rounded-full px-6 py-4 border border-white/20 outline-none focus:border-cyan-400" placeholder="Topic (e.g. Atoms)" value={topic} onChange={(e) => setTopic(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && startPuzzle()} />
+                <input className="w-full bg-white/10 rounded-full px-6 py-4 border border-white/20 outline-none focus:border-cyan-400 transition-colors" placeholder="Topic (e.g. Atoms)" value={topic} onChange={(e) => setTopic(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && startPuzzle()} />
                 <button onClick={startPuzzle} disabled={loading || !topic} className="absolute right-2 top-2 bottom-2 glass-button px-6 rounded-full font-bold bg-cyan-500/20 hover:bg-cyan-500/40">{loading ? <Loader2 className="animate-spin" /> : 'Mine'}</button>
             </div>
         </div>
@@ -593,8 +701,6 @@ export const WordPuzzle: React.FC = () => {
                 <div className="glass-panel p-4 rounded-xl aspect-square w-full max-w-[500px] grid" style={{ gridTemplateColumns: `repeat(${gridSize}, 1fr)`, gridTemplateRows: `repeat(${gridSize}, 1fr)` }}>
                     {grid.map((row, r) => row.map((char, c) => {
                         const isSelected = selectedCells.some(cell => cell.r === r && cell.c === c);
-                        // Highlight found words? Complex without storing coords. 
-                        // Just highlight selected.
                         return (
                             <button 
                                 key={`${r}-${c}`} 

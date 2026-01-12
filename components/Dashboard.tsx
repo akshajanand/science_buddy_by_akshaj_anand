@@ -1,10 +1,11 @@
+
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { ChatSession, AppView } from '../types';
 import { 
     Mic, MessageSquare, Book, Zap, ArrowRight, Play, Trophy, Sparkles, 
     Search, Headphones, Puzzle, Network, PenTool, BookOpen, FileText, 
-    Clock, Activity, Star
+    Clock, Activity, Star, Clapperboard
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -96,6 +97,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onResumeSession
     const getGradientForTool = (id: string) => {
         switch(id) {
             case AppView.RESEARCH: return "from-blue-500 to-cyan-500";
+            case AppView.VIDEO_GEN: return "from-pink-500 to-rose-500";
             case AppView.QUIZ: return "from-indigo-500 to-violet-500";
             case AppView.VOICE_CHAT: return "from-fuchsia-500 to-pink-500";
             case AppView.STORY: return "from-emerald-500 to-green-500";
@@ -112,6 +114,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onResumeSession
 
     const allActions = [
         { id: AppView.RESEARCH, title: 'Research Lab', icon: FileText, desc: 'Upload PDFs & Generate Quizzes' },
+        { id: AppView.VIDEO_GEN, title: 'AI Video Lab', icon: Clapperboard, desc: 'Generate Narrated Lessons' },
         { id: AppView.QUIZ, title: 'Flash Quiz', icon: Zap, desc: 'Instant AI Questions' },
         { id: AppView.VOICE_CHAT, title: 'Voice Lab', icon: Mic, desc: 'Talk to Science Buddy' },
         { id: AppView.STORY, title: 'Story Mode', icon: Book, desc: 'Sci-Fi Adventure' },
@@ -129,7 +132,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onResumeSession
             <div className="relative overflow-hidden rounded-3xl p-8 border border-white/10 shadow-2xl group">
                 {/* Dynamic Background */}
                 <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/60 via-purple-900/40 to-black/60 z-0"></div>
-                <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/20 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/2 group-hover:bg-cyan-500/30 transition-colors duration-1000"></div>
+                <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/20 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/2"></div>
                 
                 <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                     <div>
@@ -145,7 +148,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onResumeSession
                     </div>
                     
                     {/* Rank Badge - Hero Side */}
-                    <div className="hidden md:flex flex-col items-center bg-black/30 backdrop-blur-md p-4 rounded-2xl border border-white/10 shadow-xl">
+                    <div className="hidden md:flex flex-col items-center bg-black/30 backdrop-blur-md p-4 rounded-2xl border border-white/10 shadow-xl cursor-default">
                         <Trophy size={32} className="text-yellow-400 mb-2 drop-shadow-[0_0_15px_rgba(250,204,21,0.6)]" />
                         <span className="text-2xl font-bold text-white">Rank #{userRank}</span>
                         <span className="text-xs text-white/40 uppercase tracking-widest">Global Standings</span>
@@ -153,12 +156,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onResumeSession
                 </div>
             </div>
 
-            {/* 2. Stats & Quick Actions Grid - Optimized to 2 columns on desktop */}
-            <div className="grid grid-cols-2 gap-4">
+            {/* 2. Stats & Quick Actions Grid - Optimized for Mobile */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Stats Cards */}
                 <div className="glass-panel p-6 rounded-2xl border-l-4 border-l-cyan-500 flex flex-col justify-between group hover:bg-white/5 transition-all">
                     <div className="flex justify-between items-start mb-2">
-                        <div className="p-3 bg-cyan-500/20 text-cyan-400 rounded-xl group-hover:scale-110 transition-transform shadow-lg shadow-cyan-500/10"><MessageSquare size={24} /></div>
+                        <div className="p-3 bg-cyan-500/20 text-cyan-400 rounded-xl shadow-lg shadow-cyan-500/10"><MessageSquare size={24} /></div>
                         <span className="text-xs text-white/40 font-bold uppercase tracking-wider mt-1">Total Chats</span>
                     </div>
                     <div>
@@ -169,7 +172,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onResumeSession
 
                 <div className="glass-panel p-6 rounded-2xl border-l-4 border-l-purple-500 flex flex-col justify-between group hover:bg-white/5 transition-all">
                     <div className="flex justify-between items-start mb-2">
-                        <div className="p-3 bg-purple-500/20 text-purple-400 rounded-xl group-hover:scale-110 transition-transform shadow-lg shadow-purple-500/10"><Mic size={24} /></div>
+                        <div className="p-3 bg-purple-500/20 text-purple-400 rounded-xl shadow-lg shadow-purple-500/10"><Mic size={24} /></div>
                         <span className="text-xs text-white/40 font-bold uppercase tracking-wider mt-1">Voice Labs</span>
                     </div>
                     <div>
@@ -178,13 +181,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onResumeSession
                     </div>
                 </div>
                 
-                {/* Mobile Rank Card (Full width on mobile grid) */}
-                 <div className="md:hidden col-span-2 glass-panel p-4 rounded-2xl border-l-4 border-l-yellow-500 flex flex-col justify-between">
+                {/* Mobile Rank Card - Shows only on small screens */}
+                 <div className="md:hidden glass-panel p-6 rounded-2xl border-l-4 border-l-yellow-500 flex flex-col justify-between shadow-lg">
                     <div className="flex justify-between items-start mb-2">
                         <div className="p-2 bg-yellow-500/20 text-yellow-400 rounded-lg"><Trophy size={20} /></div>
                          <span className="text-xs text-white/30 font-bold uppercase tracking-wider">Rank</span>
                     </div>
                     <div className="text-3xl font-bold">#{userRank}</div>
+                    <div className="text-xs text-white/30 mt-1">Global Standing</div>
                 </div>
             </div>
 
@@ -196,7 +200,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onResumeSession
                         <h2 className="text-xl font-bold">Jump Back In</h2>
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         {resumeTopics.map(topic => (
                              <button 
                                 key={topic.topic}
@@ -276,18 +280,18 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onResumeSession
                     <h2 className="text-xl font-bold">Research & Tools</h2>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     {/* Render tool cards with vibrant gradients on hover/icon backgrounds */}
                     {allActions.map(action => (
                          <button 
                             key={action.id}
                             onClick={() => onNavigate(action.id)}
-                            className="group glass-panel p-5 rounded-2xl text-left relative overflow-hidden transition-all hover:bg-white/10 hover:shadow-2xl hover:border-white/20 border border-white/5"
+                            className="group glass-panel p-5 rounded-2xl text-left relative overflow-hidden transition-all hover:bg-white/10 hover:shadow-2xl hover:border-white/20 border border-white/5 active:scale-95"
                         >
                             <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
                             
                             <div className="relative z-10">
-                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 text-white shadow-lg bg-gradient-to-br ${getGradientForTool(action.id)} group-hover:scale-110 group-hover:rotate-3 transition-all duration-300`}>
+                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 text-white shadow-lg bg-gradient-to-br ${getGradientForTool(action.id)}`}>
                                     <action.icon size={24} />
                                 </div>
                                 <h3 className="text-lg font-bold mb-1 group-hover:text-cyan-300 transition-colors">{action.title}</h3>

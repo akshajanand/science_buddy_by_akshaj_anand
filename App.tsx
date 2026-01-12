@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
   MessageSquare, Book, Zap, 
-  Search, Headphones, Network, PenTool, Menu, X, Brain, Puzzle, LogOut, Loader2, Sparkles, CheckCircle, Atom, Mic, LayoutDashboard, Layers, Trophy, BarChart2, FileText, Users, Wifi, Shield, Database, Cpu, AlertTriangle, Send, Settings, Palette, User, Upload, Image as ImageIcon, Lock, Server
+  Search, Headphones, Network, PenTool, Menu, X, Brain, Puzzle, LogOut, Loader2, Sparkles, CheckCircle, Atom, Mic, LayoutDashboard, Layers, Trophy, BarChart2, FileText, Users, Wifi, Lock, Server, Cpu, AlertTriangle, Send, Settings, Palette, User, Upload, Image as ImageIcon, Layout, ArrowRight, Save, LayoutPanelLeft, LayoutPanelTop, Monitor, Smartphone, Clapperboard, Database, Globe, Command
 } from 'lucide-react';
 import emailjs from '@emailjs/browser';
-import { AppView, ChatSession } from './types';
+import { AppView } from './types';
 import ChatInterface from './components/ChatInterface';
 import VoiceChat from './components/VoiceChat';
 import { InteractiveStory, ConceptMap, StyleSwapper } from './components/CreativeTools';
@@ -16,6 +17,7 @@ import PerformanceAnalytics from './components/PerformanceAnalytics';
 import Dashboard from './components/Dashboard';
 import ResearchMode from './components/ResearchMode';
 import CommunityNotes from './components/CommunityNotes';
+import VideoGenerator from './components/VideoGenerator';
 import { analyzeUserProfile } from './services/aiService';
 import { supabase } from './services/supabaseClient';
 import { Auth } from './components/Auth';
@@ -31,6 +33,8 @@ interface UserData {
     avatar_url?: string;
     display_name?: string;
     ui_theme?: string;
+    sidebar_dock?: 'LEFT' | 'RIGHT' | 'TOP' | 'BOTTOM'; // New Field
+    custom_ai_behavior?: string;
 }
 
 const SCIENCE_FACTS = [
@@ -54,11 +58,11 @@ const THEMES = {
 };
 
 const LOADING_STEPS = [
-    { label: "Establishing Secure Connection", icon: Wifi },
-    { label: "Verifying User Credentials", icon: Lock },
-    { label: "Syncing Cloud Database", icon: Server },
-    { label: "Optimizing AI Neural Net", icon: Cpu },
-    { label: "Finalizing Interface", icon: LayoutDashboard }
+    { label: "Establishing Secure Uplink", icon: Wifi, detail: "Encryption: AES-256" },
+    { label: "Verifying Biomarkers", icon: Lock, detail: "User: Authenticated" },
+    { label: "Syncing Knowledge Base", icon: Database, detail: "Downloading Assets..." },
+    { label: "Calibrating Neural Net", icon: Brain, detail: "Optimizing Weights" },
+    { label: "Initializing Interface", icon: LayoutDashboard, detail: "Loading Modules" }
 ];
 
 const App: React.FC = () => {
@@ -81,6 +85,9 @@ const App: React.FC = () => {
   const [settingsName, setSettingsName] = useState('');
   const [settingsAvatar, setSettingsAvatar] = useState('');
   const [settingsTheme, setSettingsTheme] = useState('default');
+  const [settingsPassword, setSettingsPassword] = useState('');
+  const [settingsAIBehavior, setSettingsAIBehavior] = useState('');
+  const [settingsDock, setSettingsDock] = useState<'LEFT' | 'RIGHT' | 'TOP' | 'BOTTOM'>('LEFT');
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   
@@ -132,35 +139,29 @@ const App: React.FC = () => {
           setSettingsName(user.display_name || user.username || '');
           setSettingsAvatar(user.avatar_url || '');
           setSettingsTheme(user.ui_theme || 'default');
+          setSettingsAIBehavior(user.custom_ai_behavior || '');
+          setSettingsDock(user.sidebar_dock || 'LEFT');
+          setSettingsPassword('');
       }
   }, [isSettingsOpen, user]);
 
   const runLoadingSequence = async (userData: UserData) => {
     setLoading(true);
     setLoadingStage(0);
-
-    // Random duration selection: 5s, 7s, or 10s
-    const r = Math.random();
-    const totalDuration = r < 0.33 ? 5000 : r < 0.66 ? 7000 : 10000;
     
-    // Distribute duration across steps (weighted for realism)
-    const step1 = totalDuration * 0.10; // Connection (Fast)
-    const step2 = totalDuration * 0.15; // Verify
-    const step3 = totalDuration * 0.35; // Cloud Sync (Slowest)
-    const step4 = totalDuration * 0.25; // AI Optimization
-    const step5 = totalDuration * 0.15; // Finalize
+    const totalDuration = 2000; // Quick load since animations are removed
+    
+    const step1 = totalDuration * 0.15;
+    const step2 = totalDuration * 0.15;
+    const step3 = totalDuration * 0.40;
+    const step4 = totalDuration * 0.20;
+    const step5 = totalDuration * 0.10;
     
     const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-    // Step 1: Secure Connection
-    setLoadingStage(1);
-    await delay(step1);
-
-    // Step 2: Verification
-    setLoadingStage(2);
-    await delay(step2);
-
-    // Step 3: Syncing
+    setLoadingStage(1); await delay(step1);
+    setLoadingStage(2); await delay(step2);
+    
     setLoadingStage(3);
     try {
         const fullProfileData = {
@@ -176,13 +177,8 @@ const App: React.FC = () => {
     } catch (e) { console.error(e); }
     await delay(step3);
 
-    // Step 4: Optimizing AI
-    setLoadingStage(4);
-    await delay(step4);
-
-    // Step 5: Finalizing
-    setLoadingStage(5);
-    await delay(step5);
+    setLoadingStage(4); await delay(step4);
+    setLoadingStage(5); await delay(step5);
     
     // Complete
     setCurrentView(AppView.DASHBOARD);
@@ -246,20 +242,32 @@ const App: React.FC = () => {
       if (!user) return;
       setIsSavingSettings(true);
       
-      const updates = {
+      const updates: any = {
           display_name: settingsName,
           avatar_url: settingsAvatar,
-          ui_theme: settingsTheme
+          ui_theme: settingsTheme,
+          custom_ai_behavior: settingsAIBehavior,
+          sidebar_dock: settingsDock
       };
+
+      if (settingsPassword.trim()) {
+          updates.password = settingsPassword;
+      }
 
       // Optimistic Update
       const updatedUser = { ...user, ...updates };
       setUser(updatedUser);
       localStorage.setItem('science_buddy_user', JSON.stringify(updatedUser));
 
-      await supabase.from('users').update(updates).eq('id', user.id);
+      const { error } = await supabase.from('users').update(updates).eq('id', user.id);
       
-      showToast("Settings saved!", "success");
+      if (error) {
+          showToast("Failed to save settings: " + error.message, 'error');
+      } else {
+          showToast("Settings & Customizations Saved!", "success");
+          if (settingsPassword) setSettingsPassword(''); // Clear password field
+      }
+      
       setIsSavingSettings(false);
       setIsSettingsOpen(false);
   };
@@ -300,6 +308,7 @@ const App: React.FC = () => {
     { id: AppView.PERFORMANCE, label: 'My Performance', icon: BarChart2 }, 
     { id: AppView.RESEARCH, label: 'Research Lab', icon: FileText },
     { id: AppView.COMMUNITY, label: 'Community Notes', icon: Users }, 
+    { id: AppView.VIDEO_GEN, label: 'AI Video Lab', icon: Clapperboard }, 
     { id: AppView.LEADERBOARD, label: 'Leaderboard', icon: Trophy }, 
     { id: AppView.CHAT, label: 'AI Chat', icon: MessageSquare },
     { id: AppView.VOICE_CHAT, label: 'Voice Chat', icon: Mic },
@@ -342,6 +351,7 @@ const App: React.FC = () => {
           return <PerformanceAnalytics userId={user!.id} username={user!.username} currentUserPoints={user!.total_points || 0} />;
       case AppView.RESEARCH: return <ResearchMode userId={user!.id} username={user!.username} />;
       case AppView.COMMUNITY: return <CommunityNotes userId={user!.id} username={user!.username} />;
+      case AppView.VIDEO_GEN: return <VideoGenerator userId={user!.id} />;
       case AppView.CHAT: 
         return <ChatInterface 
             userProfile={{ name: user?.username, interests: user?.interests }} 
@@ -372,29 +382,41 @@ const App: React.FC = () => {
      return (
         <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-[#050505] text-white font-sans overflow-hidden">
              {/* Background Effects */}
-             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-indigo-900/20 via-[#050505] to-[#050505] animate-pulse"></div>
-             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-500 to-transparent opacity-50"></div>
-             <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-purple-500 to-transparent opacity-50"></div>
+             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-indigo-900/10 via-[#050505] to-[#050505]"></div>
+             <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent"></div>
+             <div className="absolute bottom-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-purple-500/50 to-transparent"></div>
 
-             <div className="w-full max-w-md relative z-10 flex flex-col items-center">
-                 {/* Central Orb/Spinner */}
-                 <div className="relative mb-12">
-                     <div className="absolute inset-0 bg-cyan-500/20 rounded-full blur-2xl animate-pulse"></div>
-                     <div className="relative z-10 p-6 bg-white/5 rounded-full border border-white/10 backdrop-blur-md shadow-2xl">
-                        <Atom size={64} className="text-cyan-400 animate-[spin_3s_linear_infinite]" />
+             {/* Animated Grid */}
+             <div className="absolute inset-0 opacity-10" style={{ 
+                 backgroundImage: 'linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px)', 
+                 backgroundSize: '40px 40px',
+                 maskImage: 'radial-gradient(circle at center, black 40%, transparent 100%)'
+             }}></div>
+
+             <div className="w-full max-w-lg relative z-10 flex flex-col items-center p-8">
+                 
+                 {/* REACTOR CORE (Static now) */}
+                 <div className="relative mb-12 w-48 h-48 flex items-center justify-center">
+                     {/* Outer Rings - Static */}
+                     <div className="absolute inset-0 rounded-full border-2 border-cyan-500/30"></div>
+                     <div className="absolute inset-4 rounded-full border-2 border-purple-500/30"></div>
+                     <div className="absolute inset-8 rounded-full border-2 border-white/20"></div>
+                     
+                     {/* Central Icon */}
+                     <div className="relative z-10 p-6 bg-black/40 rounded-full border border-white/10 backdrop-blur-md shadow-2xl">
+                        <Atom size={48} className="text-cyan-400" />
                      </div>
-                     {/* Orbital Ring 1 */}
-                     <div className="absolute inset-[-10px] border border-cyan-500/30 rounded-full animate-[spin_4s_linear_infinite_reverse] border-t-transparent border-r-transparent"></div>
-                     {/* Orbital Ring 2 */}
-                     <div className="absolute inset-[-20px] border border-purple-500/30 rounded-full animate-[spin_6s_linear_infinite] border-b-transparent border-l-transparent"></div>
                  </div>
 
-                 <h2 className="text-2xl font-bold mb-8 tracking-widest uppercase text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400 animate-pulse">
-                    System Initialization
-                 </h2>
+                 <div className="flex flex-col items-center gap-2 mb-10">
+                    <h2 className="text-3xl font-bold tracking-[0.2em] uppercase text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-white to-purple-400">
+                        System Init
+                    </h2>
+                    <div className="h-0.5 w-24 bg-gradient-to-r from-transparent via-cyan-500 to-transparent"></div>
+                 </div>
 
                  {/* 5 Step Checklist */}
-                 <div className="w-full space-y-4 px-8">
+                 <div className="w-full space-y-3 px-4 mb-8">
                      {LOADING_STEPS.map((step, index) => {
                          const stepNum = index + 1;
                          const isActive = loadingStage === stepNum;
@@ -402,24 +424,32 @@ const App: React.FC = () => {
                          const isPending = loadingStage < stepNum;
                          
                          return (
-                             <div key={index} className={`flex items-center gap-4 transition-all duration-500 ${isPending ? 'opacity-20 translate-x-4' : 'opacity-100 translate-x-0'}`}>
+                             <div key={index} className={`flex items-center gap-4 ${isPending ? 'opacity-20 grayscale' : 'opacity-100'}`}>
+                                 {/* Status Icon */}
                                  <div className={`
-                                     w-6 h-6 rounded-full flex items-center justify-center border transition-all duration-500 shadow-[0_0_10px_rgba(0,0,0,0.5)]
-                                     ${isCompleted ? 'bg-green-500 border-green-500 text-black scale-100' : 
-                                       isActive ? 'bg-cyan-500 border-cyan-400 text-black scale-110 shadow-[0_0_15px_rgba(34,211,238,0.6)]' : 
-                                       'border-white/10 bg-transparent text-transparent scale-90'}
+                                     w-8 h-8 rounded-lg flex items-center justify-center border
+                                     ${isCompleted ? 'bg-green-500/10 border-green-500/50 text-green-400' : 
+                                       isActive ? 'bg-cyan-500/10 border-cyan-500/50 text-cyan-400' : 
+                                       'border-white/5 bg-transparent text-white/20'}
                                  `}>
-                                     {isCompleted ? <CheckCircle size={14} /> : 
-                                      isActive ? <Loader2 size={14} className="animate-spin" /> : 
+                                     {isCompleted ? <CheckCircle size={16} /> : 
+                                      isActive ? <step.icon size={16} /> : 
                                       <div className="w-1.5 h-1.5 rounded-full bg-white/20" />}
                                  </div>
-                                 <div className="flex-1">
-                                     <span className={`font-medium text-sm tracking-wide transition-colors duration-300 ${isActive ? 'text-cyan-300' : isCompleted ? 'text-green-300' : 'text-white'}`}>
-                                         {step.label}
-                                     </span>
+                                 
+                                 {/* Text Content */}
+                                 <div className="flex-1 min-w-0">
+                                     <div className="flex justify-between items-baseline">
+                                        <span className={`font-bold text-sm tracking-wide ${isActive ? 'text-cyan-200' : isCompleted ? 'text-green-200/80' : 'text-white/40'}`}>
+                                            {step.label}
+                                        </span>
+                                        {isActive && <span className="text-[10px] font-mono text-cyan-400/80">{step.detail}</span>}
+                                     </div>
+                                     
+                                     {/* Progress Line - Static or hidden */}
                                      {isActive && (
-                                         <div className="h-0.5 bg-cyan-500/30 w-full mt-1 rounded-full overflow-hidden">
-                                             <div className="h-full bg-cyan-400 animate-[progress_1s_ease-in-out_infinite] w-1/2"></div>
+                                         <div className="h-1 w-full mt-1.5 rounded-full overflow-hidden bg-white/5">
+                                             <div className="h-full bg-cyan-400 w-full"></div>
                                          </div>
                                      )}
                                  </div>
@@ -429,12 +459,9 @@ const App: React.FC = () => {
                  </div>
 
                  {/* Fact Footer */}
-                 <div className="mt-12 text-center px-6 max-w-sm">
-                     <div className="inline-flex items-center gap-2 mb-3 px-3 py-1 rounded-full bg-white/5 border border-white/10">
-                        <Sparkles size={12} className="text-yellow-400" />
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-white/50">Science Fact</span>
-                     </div>
-                     <p className="text-sm font-medium text-white/80 italic leading-relaxed animate-in fade-in slide-in-from-bottom-2 duration-700 key={currentFact}">
+                 <div className="text-center px-4 max-w-sm">
+                     <p className="text-xs font-mono text-cyan-500/60 mb-2 uppercase tracking-widest">[ Fact Database ]</p>
+                     <p className="text-sm font-medium text-white/70 italic leading-relaxed key={currentFact}">
                         "{currentFact}"
                      </p>
                  </div>
@@ -454,17 +481,17 @@ const App: React.FC = () => {
 
   // --- SETTINGS MODAL ---
   const SettingsModal = () => (
-      <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in zoom-in duration-200">
-          <div className="glass-panel w-full max-w-lg p-6 rounded-2xl flex flex-col max-h-[90vh]">
+      <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="glass-panel w-full max-w-lg p-6 rounded-2xl flex flex-col max-h-[90vh] bg-[#050505]">
               <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
                   <h2 className="text-2xl font-bold flex items-center gap-2"><Settings className="text-cyan-400" /> Settings</h2>
                   <button onClick={() => setIsSettingsOpen(false)} className="hover:text-red-400"><X /></button>
               </div>
 
-              <div className="flex-1 overflow-y-auto custom-scrollbar space-y-6 pr-2">
+              <div className="flex-1 overflow-y-auto custom-scrollbar space-y-8 pr-2">
                   {/* Public Profile Section */}
                   <div className="space-y-4">
-                      <h3 className="text-sm font-bold uppercase tracking-widest opacity-50 flex items-center gap-2"><User size={14}/> Public Profile</h3>
+                      <h3 className="text-sm font-bold uppercase tracking-widest opacity-50 flex items-center gap-2 text-cyan-200"><User size={14}/> Public Profile</h3>
                       
                       <div className="flex items-center gap-4">
                           <div className="w-20 h-20 rounded-full bg-white/10 border border-white/20 overflow-hidden flex items-center justify-center shrink-0 relative group">
@@ -490,33 +517,81 @@ const App: React.FC = () => {
                       <div>
                           <label className="text-xs font-bold mb-1 block">DISPLAY NAME (Optional)</label>
                           <input 
-                              className="w-full bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-sm focus:border-cyan-400 outline-none" 
+                              className="w-full bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-sm focus:border-cyan-400 outline-none transition-colors" 
                               placeholder={`Defaults to @${user.username}`}
                               value={settingsName}
                               onChange={(e) => setSettingsName(e.target.value)}
                           />
-                          <p className="text-[10px] opacity-40 mt-1">Used in Leaderboard and Community Notes.</p>
                       </div>
                   </div>
 
-                  {/* UI Customization Section */}
+                  {/* Layout & UI */}
                   <div className="space-y-4">
-                      <h3 className="text-sm font-bold uppercase tracking-widest opacity-50 flex items-center gap-2"><Palette size={14}/> Interface Theme</h3>
+                      <h3 className="text-sm font-bold uppercase tracking-widest opacity-50 flex items-center gap-2 text-green-200"><Layout size={14}/> Interface Layout</h3>
                       
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {Object.entries(THEMES).map(([key, theme]) => (
-                              <button 
-                                  key={key}
-                                  onClick={() => setSettingsTheme(key)}
-                                  className={`p-3 rounded-xl border text-left transition-all relative overflow-hidden group ${settingsTheme === key ? 'border-cyan-400 bg-white/10' : 'border-white/10 hover:bg-white/5'}`}
-                              >
-                                  <div className="absolute inset-0 opacity-30" style={{background: theme.gradient}}></div>
-                                  <div className="relative z-10 flex justify-between items-center">
-                                      <span className="font-bold text-sm">{theme.name}</span>
-                                      {settingsTheme === key && <CheckCircle size={16} className="text-cyan-400" />}
-                                  </div>
-                              </button>
-                          ))}
+                      <div>
+                          <label className="text-xs font-bold mb-2 block">SIDEBAR POSITION (Desktop Only)</label>
+                          <div className="grid grid-cols-2 gap-2">
+                              {['LEFT', 'RIGHT', 'TOP', 'BOTTOM'].map((pos) => (
+                                  <button
+                                    key={pos}
+                                    onClick={() => setSettingsDock(pos as any)}
+                                    className={`px-4 py-3 rounded-xl text-xs font-bold transition-all border ${settingsDock === pos ? 'bg-green-500/20 border-green-500 text-green-300' : 'bg-white/5 border-white/10 hover:bg-white/10 text-white/50'}`}
+                                  >
+                                      {pos}
+                                  </button>
+                              ))}
+                          </div>
+                      </div>
+
+                      <div>
+                          <label className="text-xs font-bold mb-2 block">COLOR THEME</label>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {Object.entries(THEMES).map(([key, theme]) => (
+                                  <button 
+                                      key={key}
+                                      onClick={() => setSettingsTheme(key)}
+                                      className={`p-3 rounded-xl border text-left transition-all relative overflow-hidden group ${settingsTheme === key ? 'border-cyan-400 bg-white/10' : 'border-white/10 hover:bg-white/5'}`}
+                                  >
+                                      <div className="absolute inset-0 opacity-30" style={{background: theme.gradient}}></div>
+                                      <div className="relative z-10 flex justify-between items-center">
+                                          <span className="font-bold text-sm">{theme.name}</span>
+                                          {settingsTheme === key && <CheckCircle size={16} className="text-cyan-400" />}
+                                      </div>
+                                  </button>
+                              ))}
+                          </div>
+                      </div>
+                  </div>
+
+                  {/* AI Personality Config */}
+                  <div className="space-y-4">
+                      <h3 className="text-sm font-bold uppercase tracking-widest opacity-50 flex items-center gap-2 text-purple-200"><Brain size={14}/> AI Behavior</h3>
+                      <div>
+                          <label className="text-xs font-bold mb-1 block">CUSTOM INSTRUCTIONS</label>
+                          <textarea 
+                              className="w-full h-24 bg-white/10 border border-white/10 rounded-lg p-3 text-sm focus:border-purple-400 outline-none transition-colors resize-none" 
+                              placeholder="e.g. 'Explain things like I am 5', 'Be sarcastic but helpful', 'Always use soccer analogies'."
+                              value={settingsAIBehavior}
+                              onChange={(e) => setSettingsAIBehavior(e.target.value)}
+                          />
+                          <p className="text-[10px] opacity-40 mt-1">This applies to Chat, Voice, and Study Pods.</p>
+                      </div>
+                  </div>
+
+                  {/* Security Section */}
+                  <div className="space-y-4">
+                      <h3 className="text-sm font-bold uppercase tracking-widest opacity-50 flex items-center gap-2 text-red-200"><Lock size={14}/> Security</h3>
+                      <div>
+                          <label className="text-xs font-bold mb-1 block">CHANGE PASSWORD</label>
+                          <input 
+                              type="password"
+                              className="w-full bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-sm focus:border-red-400 outline-none transition-colors" 
+                              placeholder="Enter new password to change"
+                              value={settingsPassword}
+                              onChange={(e) => setSettingsPassword(e.target.value)}
+                          />
+                          <p className="text-[10px] opacity-40 mt-1">Leave empty to keep current password.</p>
                       </div>
                   </div>
               </div>
@@ -526,9 +601,9 @@ const App: React.FC = () => {
                   <button 
                       onClick={handleSaveSettings}
                       disabled={isSavingSettings}
-                      className="px-6 py-2 rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 font-bold flex items-center gap-2 shadow-lg text-white"
+                      className="px-6 py-2 rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 font-bold flex items-center gap-2 shadow-lg text-white hover:scale-105 transition-transform"
                   >
-                      {isSavingSettings ? <Loader2 className="animate-spin" size={16} /> : <CheckCircle size={16} />}
+                      {isSavingSettings ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
                       Save Changes
                   </button>
               </div>
@@ -536,8 +611,44 @@ const App: React.FC = () => {
       </div>
   );
 
+  const dock = user?.sidebar_dock || 'LEFT';
+  const isHorizontalDock = dock === 'TOP' || dock === 'BOTTOM';
+
+  // Determine Layout Classes based on dock position
+  const getContainerClass = () => {
+      // Mobile: Always col (sidebar is hidden/drawer)
+      // Desktop: Depends on Dock
+      if (dock === 'RIGHT') return 'flex-col md:flex-row-reverse';
+      if (dock === 'TOP') return 'flex-col md:flex-col';
+      if (dock === 'BOTTOM') return 'flex-col md:flex-col-reverse';
+      return 'flex-col md:flex-row'; // LEFT default
+  };
+
+  const getSidebarClass = () => {
+      // Base: Mobile Drawer (Fixed) -> Desktop Relative
+      let base = `fixed inset-y-0 left-0 z-50 w-72 glass-panel m-2 rounded-2xl flex flex-col p-4 shadow-2xl transition-transform duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1.0)] md:relative md:translate-x-0 md:shadow-none md:inset-auto md:m-0`;
+      
+      // Mobile Toggle
+      if (mobileMenuOpen) {
+          base += ' translate-x-0'; 
+      } else {
+          base += ' -translate-x-[120%]';
+      }
+
+      // Desktop Overrides
+      if (isHorizontalDock) {
+          // Horizontal: Full width, auto height, flex row
+          base += ' md:w-full md:h-auto md:flex-row md:items-center md:justify-between md:p-3 shrink-0';
+      } else {
+          // Vertical: Fixed width, Full height
+          base += ' md:w-72 md:h-full md:flex-col shrink-0';
+      }
+
+      return base;
+  };
+
   return (
-    <div className={`flex h-[100dvh] w-screen overflow-hidden font-sans p-2 md:p-6 gap-6 relative bg-transparent transition-colors duration-500`}>
+    <div className={`flex h-[100dvh] w-screen overflow-hidden font-sans p-2 md:p-6 md:gap-6 relative bg-transparent transition-colors duration-500 ${getContainerClass()}`}>
       
       <ToastContainer />
       
@@ -546,7 +657,7 @@ const App: React.FC = () => {
       
       {isFeedbackOpen && (
         <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="glass-panel w-full max-w-md p-6 rounded-2xl animate-in zoom-in duration-200 border-white/20">
+            <div className="glass-panel w-full max-w-md p-6 rounded-2xl border-white/20">
                 <div className="flex justify-between items-start mb-4">
                     <h3 className="text-xl font-bold flex items-center gap-2"><AlertTriangle className="text-yellow-400" size={20} /> Report Issue</h3>
                     <button onClick={() => setIsFeedbackOpen(false)} className="hover:text-red-400"><X size={20}/></button>
@@ -577,7 +688,7 @@ const App: React.FC = () => {
         </div>
       )}
       
-      {/* Mobile Menu Button */}
+      {/* Mobile Menu Button - Always top left on mobile */}
       <button 
         className={`md:hidden absolute top-4 left-4 z-50 p-2 glass-button rounded-lg`}
         onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -585,35 +696,39 @@ const App: React.FC = () => {
         {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
       </button>
 
-      {/* Navigation Sidebar */}
+      {/* Mobile Backdrop */}
       <div 
         className={`fixed inset-0 bg-black/80 backdrop-blur-sm z-40 transition-opacity duration-300 md:hidden ${mobileMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
         onClick={() => setMobileMenuOpen(false)}
       />
 
-      <nav className={`
-        fixed inset-y-0 left-0 z-50 w-72 glass-panel m-2 rounded-2xl flex flex-col p-4 transform transition-transform duration-300 shadow-2xl
-        md:relative md:translate-x-0 md:inset-auto md:m-0 md:h-full md:w-64 md:flex md:shadow-none
-        ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-[120%]'}
-      `}>
-        <div className="mb-8 p-2 text-center mt-12 md:mt-0">
-          <div className="inline-flex p-3 rounded-full bg-white/5 mb-3 border border-white/10">
-             <Atom size={32} className="text-cyan-400 animate-[spin_10s_linear_infinite]" />
+      {/* ADAPTIVE SIDEBAR */}
+      <nav className={getSidebarClass()}>
+        
+        {/* Header Section */}
+        <div className={`mb-8 p-2 text-center mt-12 md:mt-0 ${isHorizontalDock ? 'md:mb-0 md:flex md:items-center md:gap-4 md:text-left md:w-auto md:p-0 md:px-4' : ''}`}>
+          <div className={`inline-flex p-3 rounded-full bg-white/5 mb-3 border border-white/10 ${isHorizontalDock ? 'md:mb-0 md:p-2' : ''}`}>
+             <Atom size={isHorizontalDock ? 24 : 32} className="text-cyan-400" />
           </div>
-          <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-purple-400">Science Buddy</h1>
-          
-          <div className="mt-4 flex flex-col items-center">
-              <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-white/20 mb-2">
-                  {user.avatar_url ? <img src={user.avatar_url} className="w-full h-full object-cover"/> : <User size={32} className="w-full h-full p-3 bg-white/10"/>}
-              </div>
-              <div className="text-sm font-bold truncate max-w-[150px]">{user.display_name || user.username}</div>
-              <div className="flex items-center justify-center gap-1 text-yellow-400 font-bold text-xs mt-1">
-                <Trophy size={12} /> {user.total_points || 0} pts
-              </div>
+          <div className={isHorizontalDock ? 'hidden lg:block' : ''}>
+              <h1 className={`font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-purple-400 ${isHorizontalDock ? 'text-lg' : 'text-2xl'}`}>Science Buddy</h1>
+              
+              {!isHorizontalDock && (
+                  <div className="mt-4 flex flex-col items-center">
+                      <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-white/20 mb-2 shadow-[0_0_15px_rgba(255,255,255,0.1)]">
+                          {user.avatar_url ? <img src={user.avatar_url} className="w-full h-full object-cover"/> : <User size={32} className="w-full h-full p-3 bg-white/10"/>}
+                      </div>
+                      <div className="text-sm font-bold truncate max-w-[150px]">{user.display_name || user.username}</div>
+                      <div className="flex items-center justify-center gap-1 text-yellow-400 font-bold text-xs mt-1">
+                        <Trophy size={12} /> {user.total_points || 0} pts
+                      </div>
+                  </div>
+              )}
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2">
+        {/* Menu Items */}
+        <div className={`flex-1 overflow-y-auto custom-scrollbar space-y-2 ${isHorizontalDock ? 'md:flex md:flex-row md:space-y-0 md:space-x-1 md:items-center md:overflow-x-auto md:overflow-y-hidden md:px-4' : ''}`}>
           {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = currentView === item.id;
@@ -627,44 +742,60 @@ const App: React.FC = () => {
                   setMobileMenuOpen(false);
                 }}
                 className={`
-                  w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all border active:scale-95
+                  flex items-center gap-3 px-4 py-3 rounded-xl transition-all border active:scale-95
+                  ${isHorizontalDock ? 'md:py-2 md:px-3 md:justify-center' : 'w-full'}
                   ${isActive 
                     ? 'bg-white/10 border-white/20 font-bold shadow-lg' 
                     : 'bg-transparent border-transparent hover:bg-white/5 opacity-70 hover:opacity-100'}
                 `}
+                title={item.label}
               >
                 <Icon size={20} className={isActive ? 'text-cyan-400' : ''} />
-                <span>{item.label}</span>
+                <span className={isHorizontalDock ? 'hidden xl:inline' : ''}>{item.label}</span>
               </button>
             );
           })}
         </div>
         
-        <div className="mt-auto pt-4">
-            <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl hover:bg-red-500/20 opacity-60 hover:opacity-100 transition-all text-sm mb-4">
-                <LogOut size={16} /> Logout
+        {/* Footer / User Actions */}
+        <div className={`mt-auto pt-4 ${isHorizontalDock ? 'md:pt-0 md:mt-0 md:flex md:items-center md:gap-2 md:px-4' : ''}`}>
+            {isHorizontalDock && (
+                 <div className="hidden md:flex items-center gap-2 mr-4">
+                    <div className="w-8 h-8 rounded-full overflow-hidden border border-white/20">
+                        {user.avatar_url ? <img src={user.avatar_url} className="w-full h-full object-cover"/> : <User size={16} className="w-full h-full p-1 bg-white/10"/>}
+                    </div>
+                    <div className="text-xs font-bold text-yellow-400 flex gap-1"><Trophy size={14}/> {user.total_points || 0}</div>
+                 </div>
+            )}
+
+            <button onClick={handleLogout} className={`flex items-center justify-center gap-2 py-3 rounded-xl hover:bg-red-500/20 opacity-60 hover:opacity-100 transition-all text-sm ${isHorizontalDock ? 'md:py-2 md:px-3 md:w-auto' : 'w-full mb-4'}`}>
+                <LogOut size={16} /> <span className={isHorizontalDock ? 'hidden lg:inline' : ''}>Logout</span>
             </button>
-            <div className="text-center p-4 border-t border-white/5">
-                <p className="text-xs text-white/40 uppercase tracking-widest mb-1">Developed By</p>
-                <h3 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-purple-400">Akshaj</h3>
-            </div>
+            
+            {!isHorizontalDock && (
+                <div className="text-center p-4 border-t border-white/5">
+                    <p className="text-xs text-white/40 uppercase tracking-widest mb-1">Developed By</p>
+                    <h3 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-purple-400">Akshaj</h3>
+                </div>
+            )}
         </div>
       </nav>
 
-      <main className={`flex-1 glass-panel rounded-2xl overflow-hidden relative z-10 h-full w-full flex flex-col shadow-2xl`}>
-         {/* TOP HEADER BAR */}
-         <div className="h-16 shrink-0 flex items-center justify-end px-6 gap-4 border-b border-white/5 bg-black/5">
-              {/* Add Top Buttons */}
+      <main 
+        className={`flex-1 glass-panel rounded-2xl overflow-hidden relative z-0 h-full w-full flex flex-col shadow-2xl min-w-0 transition-all duration-500 ease-[cubic-bezier(0.25,0.1,0.25,1.0)]`}
+      >
+         {/* TOP HEADER BAR (Only visible if docking is Left/Right, otherwise merged or adjusted) */}
+         <div className="h-16 shrink-0 flex items-center justify-end px-6 gap-4 border-b border-white/5 bg-black/5 backdrop-blur-sm">
               <button 
                   onClick={() => setIsFeedbackOpen(true)}
-                  className="p-2 rounded-full hover:bg-white/10 transition-colors opacity-70 hover:opacity-100"
+                  className="p-2 rounded-full hover:bg-white/10 transition-colors opacity-70 hover:opacity-100 active:scale-95"
                   title="Report Issue"
               >
                   <AlertTriangle size={20} />
               </button>
               <button 
                   onClick={() => setIsSettingsOpen(true)}
-                  className="p-2 rounded-full hover:bg-white/10 transition-colors opacity-70 hover:opacity-100"
+                  className="p-2 rounded-full hover:bg-white/10 transition-colors opacity-70 hover:opacity-100 active:scale-95"
                   title="Settings"
               >
                   <Settings size={20} />
@@ -672,7 +803,9 @@ const App: React.FC = () => {
          </div>
 
          <div className="flex-1 overflow-hidden relative">
-            {renderContent()}
+             <div className="h-full w-full">
+                {renderContent()}
+             </div>
          </div>
       </main>
 

@@ -14,7 +14,8 @@ export enum AppView {
   CONCEPT_MAP = 'CONCEPT_MAP',
   STYLE_SWAPPER = 'STYLE_SWAPPER',
   RESEARCH = 'RESEARCH',
-  COMMUNITY = 'COMMUNITY', // New Feature
+  COMMUNITY = 'COMMUNITY', 
+  VIDEO_GEN = 'VIDEO_GEN' // New Video Generator
 }
 
 export interface ChatSession {
@@ -124,4 +125,19 @@ export interface CommunityNote {
     content: string;
     file_type: string;
     created_at: string;
+}
+
+export interface VideoSlide {
+  text: string;
+  keyword: string;
+  imageUrl?: string;
+  photographer?: string;
+}
+
+export interface VideoProject {
+  id: string;
+  user_id: string;
+  title: string;
+  slides: VideoSlide[];
+  created_at: string;
 }

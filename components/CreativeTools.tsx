@@ -6,6 +6,14 @@ import { renderRichText } from '../utils/textUtils';
 import { supabase } from '../services/supabaseClient';
 import { showToast } from '../utils/notificationUtils';
 
+// Helper for AI XP Reward (duplicated for safety in this module)
+const awardXP = async (userId: string, amount: number, activity: string) => {
+    try {
+        await supabase.rpc('increment_score', { row_id: userId, points: amount });
+        showToast(`AI Reward: +${amount} XP for ${activity}! 🌟`, 'success');
+    } catch (e) { console.error(e); }
+};
+
 // --- Story Component ---
 export const InteractiveStory: React.FC = () => {
   const [node, setNode] = useState<StoryNode | null>(null);
@@ -13,6 +21,12 @@ export const InteractiveStory: React.FC = () => {
   const [started, setStarted] = useState(false);
   const [history, setHistory] = useState<string>('');
   const [topic, setTopic] = useState('');
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const userStr = localStorage.getItem('science_buddy_user');
+    if (userStr) setUserId(JSON.parse(userStr).id);
+  }, []);
 
   const handleStart = async () => {
     if (!topic) return;
@@ -22,6 +36,7 @@ export const InteractiveStory: React.FC = () => {
         setNode({ ...data, id: 'start' });
         setHistory(data.text);
         setStarted(true);
+        if (userId) awardXP(userId, 5, "Starting Adventure");
     }
     setLoading(false);
   };
@@ -32,13 +47,14 @@ export const InteractiveStory: React.FC = () => {
     if (data) {
         setNode({ ...data, id: Date.now().toString() });
         setHistory(prev => prev + "\n" + data.text);
+        if (userId) awardXP(userId, 2, "Story Decision");
     }
     setLoading(false);
   };
 
   if (!started) {
       return (
-          <div className="flex flex-col items-center justify-center h-full text-center p-8">
+          <div className="flex flex-col items-center justify-center h-full text-center p-8 animate-in zoom-in">
               <BookOpen size={64} className="mb-4 text-purple-300" />
               <h2 className="text-3xl font-bold mb-4">Scientific Adventure</h2>
               <p className="mb-8 max-w-md">Embark on a journey through any scientific concept. Your choices determine the outcome!</p>
@@ -49,7 +65,7 @@ export const InteractiveStory: React.FC = () => {
                     value={topic}
                     onChange={(e) => setTopic(e.target.value)}
                     placeholder="Enter Adventure Topic (e.g. Inside a Volcano)"
-                    className="w-full bg-white/10 border border-white/20 rounded-xl px-6 py-4 text-lg focus:outline-none focus:border-purple-400 placeholder-white/40"
+                    className="w-full bg-white/10 border border-white/20 rounded-xl px-6 py-4 text-lg focus:outline-none focus:border-purple-400 placeholder-white/40 transition-colors"
                     onKeyDown={(e) => e.key === 'Enter' && handleStart()}
                   />
                   <button 
@@ -67,7 +83,7 @@ export const InteractiveStory: React.FC = () => {
   return (
       <div className="h-full flex flex-col p-6 overflow-y-auto custom-scrollbar">
           <div className="flex-1">
-            <div className="glass-panel p-6 rounded-2xl mb-6 bg-black/20">
+            <div className="glass-panel p-6 rounded-2xl mb-6 bg-black/20 animate-in fade-in slide-in-from-bottom-2">
                 <p className="text-lg leading-relaxed whitespace-pre-wrap">{node?.text}</p>
             </div>
           </div>
@@ -120,7 +136,7 @@ export const StyleSwapper: React.FC = () => {
             <div className="flex-1 flex flex-col gap-4">
                 <h3 className="text-xl font-bold flex items-center gap-2"><BookOpen size={20}/> Original Text</h3>
                 <textarea 
-                    className="flex-1 w-full bg-white/10 rounded-xl p-4 resize-none border border-white/20 focus:outline-none focus:ring-2 focus:ring-purple-400"
+                    className="flex-1 w-full bg-white/10 rounded-xl p-4 resize-none border border-white/20 focus:outline-none focus:ring-2 focus:ring-purple-400 transition-all"
                     placeholder="Paste a boring paragraph from your textbook here..."
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
@@ -142,7 +158,7 @@ export const StyleSwapper: React.FC = () => {
                 <button 
                     onClick={handleSwap} 
                     disabled={loading || !input}
-                    className="glass-button p-4 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 hover:scale-110 transition-transform"
+                    className="glass-button p-4 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 hover:scale-110 transition-transform shadow-lg"
                 >
                     <Sparkles size={24} className={loading ? 'animate-spin' : ''}/>
                 </button>
@@ -255,6 +271,7 @@ export const ConceptMap: React.FC<ConceptMapProps> = ({ userId, overrideData }) 
             const result = await generateConceptMapData(searchTopic);
             if (result && result.root && Array.isArray(result.children)) {
                 setData(result);
+                if (userId) awardXP(userId, 15, "Generating Concept Map");
             }
         } catch (e) { console.error(e); }
         setLoading(false);
@@ -273,6 +290,7 @@ export const ConceptMap: React.FC<ConceptMapProps> = ({ userId, overrideData }) 
         } else if (savedEntry) {
             setSavedMaps(prev => [savedEntry, ...prev]);
             showToast("Map saved successfully", 'success');
+            awardXP(userId, 5, "Saving Map");
         }
         setSaving(false);
     };
@@ -303,6 +321,7 @@ export const ConceptMap: React.FC<ConceptMapProps> = ({ userId, overrideData }) 
                 setData(result);
                 setSelectedNode(null);
                 resetView();
+                if (userId) awardXP(userId, 5, "Deep Dive");
             }
         } catch(e) { console.error(e); }
         setLoading(false);

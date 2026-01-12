@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Science Buddy - Class 8</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><circle cx=%2250%22 cy=%2250%22 r=%2240%22 stroke=%22%2322d3ee%22 stroke-width=%228%22 fill=%22none%22 opacity=%220.8%22 /><circle cx=%2250%22 cy=%2250%22 r=%2210%22 fill=%22%23a855f7%22 /><path d=%22M50 10 A40 40 0 0 1 50 90%22 stroke=%22%23a855f7%22 stroke-width=%228%22 fill=%22none%22 stroke-dasharray=%2220 10%22 opacity=%220.6%22><animateTransform attributeName=%22transform%22 type=%22rotate%22 from=%220 50 50%22 to=%22360 50 50%22 dur=%224s%22 repeatCount=%22indefinite%22/></path></svg>">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><circle cx=%2250%22 cy=%2250%22 r=%2240%22 stroke=%22%2322d3ee%22 stroke-width=%228%22 fill=%22none%22 opacity=%220.8%22 /><circle cx=%2250%22 cy=%2250%22 r=%2210%22 fill=%22%23a855f7%22 /><path d=%22M50 10 A40 40 0 0 1 50 90%22 stroke=%22%23a855f7%22 stroke-width=%228%22 fill=%22none%22 stroke-dasharray=%2220 10%22 opacity=%220.6%22></path></svg>">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -47,17 +47,9 @@
         /* Default Dark Gradient Theme */
         background: linear-gradient(125deg, #020024, #090979, #2d0042, #000000);
         background-size: 300% 300%;
-        animation: gradientBG 20s ease infinite;
         color: var(--text-color);
         margin: 0;
         overflow: hidden;
-        transition: color 0.5s ease;
-      }
-
-      @keyframes gradientBG {
-        0% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-        100% { background-position: 0% 50%; }
       }
 
       .glass-panel {
@@ -66,20 +58,16 @@
         -webkit-backdrop-filter: blur(20px);
         border: 1px solid var(--glass-border);
         box-shadow: var(--glass-shadow);
-        transition: background 0.5s ease, border-color 0.5s ease, box-shadow 0.5s ease;
       }
 
       .glass-button {
         background: rgba(255, 255, 255, 0.1);
         backdrop-filter: blur(4px);
         border: 1px solid var(--glass-border);
-        transition: all 0.3s ease;
       }
 
       .glass-button:hover {
         background: rgba(255, 255, 255, 0.2);
-        transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
       }
 
       .custom-scrollbar::-webkit-scrollbar {

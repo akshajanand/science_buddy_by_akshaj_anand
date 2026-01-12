@@ -1,9 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Play, RotateCcw } from 'lucide-react';
+import { supabase } from '../services/supabaseClient';
+import { showToast } from '../utils/notificationUtils';
 
 const GRAVITY = 0.6;
 const JUMP_FORCE = -10;
 const SPEED = 5;
+
+const awardXP = async (userId: string, amount: number) => {
+    try {
+        await supabase.rpc('increment_score', { row_id: userId, points: amount });
+        showToast(`AI Reward: +${amount} XP for Playing!`, 'success');
+    } catch(e) {}
+}
 
 interface Particle {
   x: number;
@@ -19,7 +28,13 @@ const ScienceGame: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [gameState, setGameState] = useState<'START' | 'PLAYING' | 'GAME_OVER'>('START');
   const [score, setScore] = useState(0);
+  const [userId, setUserId] = useState<string | null>(null);
   
+  useEffect(() => {
+    const userStr = localStorage.getItem('science_buddy_user');
+    if (userStr) setUserId(JSON.parse(userStr).id);
+  }, []);
+
   // Game Refs to avoid stale closures in loop
   const playerRef = useRef({ x: 50, y: 200, width: 30, height: 30, dy: 0, grounded: false });
   const obstaclesRef = useRef<{x: number, y: number, w: number, h: number, type: 'BAD'}[]>([]);
@@ -136,6 +151,10 @@ const ScienceGame: React.FC = () => {
           player.y + player.height > obs.y
         ) {
           setGameState('GAME_OVER');
+          // Award XP on Game Over based on score/10 (int)
+          if (userId && scoreRef.current > 0) {
+              awardXP(userId, Math.floor(scoreRef.current / 10));
+          }
         }
       });
       
@@ -203,7 +222,7 @@ const ScienceGame: React.FC = () => {
   }, [gameState]);
 
   return (
-    <div className="flex flex-col items-center justify-center h-full glass-panel rounded-2xl p-6 relative overflow-hidden">
+    <div className="flex flex-col items-center justify-center h-full glass-panel rounded-2xl p-6 relative overflow-hidden animate-in fade-in">
       <h2 className="text-3xl font-bold mb-4">Atom Jumper</h2>
       <div className="absolute top-6 right-6 text-2xl font-bold text-yellow-300">
           Score: {score}
