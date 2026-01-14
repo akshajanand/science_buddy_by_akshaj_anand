@@ -133,6 +133,28 @@ const App: React.FC = () => {
     }
   }, [user?.ui_theme]);
 
+  // Global Points Update Listener
+  useEffect(() => {
+      const handlePointsUpdate = (e: CustomEvent) => {
+          const pointsToAdd = e.detail;
+          if (typeof pointsToAdd === 'number') {
+              setUser(prev => {
+                  if (!prev) return null;
+                  const newTotal = (prev.total_points || 0) + pointsToAdd;
+                  const updatedUser = { ...prev, total_points: newTotal };
+                  // Sync to local storage so refresh keeps the new score
+                  localStorage.setItem('science_buddy_user', JSON.stringify(updatedUser));
+                  return updatedUser;
+              });
+          }
+      };
+
+      window.addEventListener('science-buddy-points-update', handlePointsUpdate as EventListener);
+      return () => {
+          window.removeEventListener('science-buddy-points-update', handlePointsUpdate as EventListener);
+      };
+  }, []);
+
   // Initialize Settings Form when opened
   useEffect(() => {
       if (isSettingsOpen && user) {
@@ -329,6 +351,8 @@ const App: React.FC = () => {
                 topic={selectedTopic}
                 userInterests={user!.interests}
                 onBack={() => setSelectedTopic(null)}
+                // We don't need to pass a handler here anymore because the component dispatches an event
+                // but we keep the prop interface compatible
                 onScoreUpdate={() => {}} 
             />;
         }

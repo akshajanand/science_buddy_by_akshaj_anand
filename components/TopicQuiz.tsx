@@ -110,7 +110,9 @@ const TopicQuiz: React.FC<TopicQuizProps> = ({ userId, topic, userInterests, onB
             // Update User Total Points (Leaderboard)
             await supabase.rpc('increment_score', { row_id: userId, points: 2 });
             
-            // Notify Parent Component to refresh score in UI immediately (Optimistic)
+            // Notify App immediately via event bus
+            window.dispatchEvent(new CustomEvent('science-buddy-points-update', { detail: 2 }));
+            
             if (onScoreUpdate) onScoreUpdate(2);
         }
 

@@ -111,13 +111,15 @@ const cleanAndParseJSON = (text: string | null): any => {
 // --- XP SYSTEM ---
 
 /**
- * Awards XP to the user.
+ * Awards XP to the user and notifies the UI.
  */
 export const checkAndAwardDailyXP = async (userId: string, amount: number, activityName: string) => {
     try {
         // Daily limit check removed by request.
         await supabase.rpc('increment_score', { row_id: userId, points: amount });
         showToast(`+${amount} XP! ${activityName} 🌟`, 'success');
+        // Notify Client App to update state immediately
+        window.dispatchEvent(new CustomEvent('science-buddy-points-update', { detail: amount }));
     } catch (e) {
         console.error("XP Error", e);
     }

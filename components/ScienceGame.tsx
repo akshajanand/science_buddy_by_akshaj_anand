@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { Play, RotateCcw } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
@@ -11,6 +12,8 @@ const awardXP = async (userId: string, amount: number) => {
     try {
         await supabase.rpc('increment_score', { row_id: userId, points: amount });
         showToast(`AI Reward: +${amount} XP for Playing!`, 'success');
+        // Notify App
+        window.dispatchEvent(new CustomEvent('science-buddy-points-update', { detail: amount }));
     } catch(e) {}
 }
 
