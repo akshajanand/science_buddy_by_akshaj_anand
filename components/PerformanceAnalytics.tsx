@@ -1,8 +1,10 @@
+
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { generatePerformanceReport } from '../services/aiService';
 import { renderRichText } from '../utils/textUtils';
 import { BarChart2, TrendingUp, Target, Award, Brain, Zap, Loader2, FileText, Headphones, Users } from 'lucide-react';
+import { Skeleton } from './Skeleton';
 
 interface PerformanceAnalyticsProps {
     userId: string;
@@ -85,7 +87,17 @@ const PerformanceAnalytics: React.FC<PerformanceAnalyticsProps> = ({ userId, use
     };
 
     if (loading) {
-        return <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-cyan-400" size={48} /></div>;
+        return (
+            <div className="h-full flex flex-col p-6 overflow-y-auto custom-scrollbar">
+                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+                    {[1, 2, 3, 4, 5, 6].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}
+                </div>
+                <div className="flex flex-col lg:flex-row gap-6">
+                    <Skeleton className="flex-1 h-64 rounded-2xl" />
+                    <Skeleton className="flex-1 h-64 rounded-2xl" />
+                </div>
+            </div>
+        );
     }
 
     return (

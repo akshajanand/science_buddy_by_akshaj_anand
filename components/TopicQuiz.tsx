@@ -1,9 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { generateQuizQuestions } from '../services/aiService';
 import { QuizQuestion } from '../types';
 import { Loader2, CheckCircle, XCircle, ArrowLeft, Trophy, ArrowRight } from 'lucide-react';
 import { showToast } from '../utils/notificationUtils';
+import { Skeleton } from './Skeleton';
 
 interface TopicQuizProps {
     userId: string;
@@ -54,7 +56,7 @@ const TopicQuiz: React.FC<TopicQuizProps> = ({ userId, topic, userInterests, onB
 
     const generateNewQuiz = async () => {
         setGenerating(true);
-        // Generate 30 questions with a random seed to prevent repeats
+        // Generate 30 questions with a random seed
         const seed = Date.now().toString();
         const newQuestions = await generateQuizQuestions(topic, 30, userInterests, seed);
         
@@ -88,12 +90,16 @@ const TopicQuiz: React.FC<TopicQuizProps> = ({ userId, topic, userInterests, onB
         setLoading(false);
     };
 
+    const normalize = (text: string) => text ? text.trim().toLowerCase() : '';
+
     const handleAnswer = async (option: string) => {
         if (selectedOption) return; // Prevent double click
         
         setSelectedOption(option);
         const currentQ = questions[currentIndex];
-        const correct = option === currentQ.correctAnswer;
+        
+        // Robust comparison
+        const correct = normalize(option) === normalize(currentQ.correctAnswer);
         setIsCorrect(correct);
 
         let newScore = score;
@@ -142,23 +148,36 @@ const TopicQuiz: React.FC<TopicQuizProps> = ({ userId, topic, userInterests, onB
                     <Loader2 size={64} className="text-cyan-400 animate-spin relative z-10" />
                 </div>
                 <h2 className="text-2xl font-bold mb-2">Generating Quiz...</h2>
-                <p className="text-white/60">Crafting 30 personalized questions about {topic} based on your interest in {userInterests}.</p>
-                <p className="text-xs text-white/40 mt-4">This uses advanced AI and might take a few seconds.</p>
+                <p className="opacity-60">Crafting personalized questions about {topic} based on your interest in {userInterests}.</p>
+                <p className="text-xs opacity-40 mt-4">This uses advanced AI and might take a few seconds.</p>
             </div>
         );
     }
 
-    if (loading) return <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin"/></div>;
+    if (loading) {
+        return (
+            <div className="h-full flex flex-col p-8 gap-6">
+                <Skeleton className="h-10 w-full rounded-xl" />
+                <Skeleton className="h-48 w-full rounded-2xl" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Skeleton className="h-20 w-full rounded-xl" />
+                    <Skeleton className="h-20 w-full rounded-xl" />
+                    <Skeleton className="h-20 w-full rounded-xl" />
+                    <Skeleton className="h-20 w-full rounded-xl" />
+                </div>
+            </div>
+        );
+    }
 
     if (isComplete) {
         return (
-            <div className="h-full flex flex-col items-center justify-center text-center p-8 animate-in zoom-in">
+            <div className="h-full flex flex-col items-center justify-center text-center p-8">
                 <Trophy size={80} className="text-yellow-300 mb-6 drop-shadow-[0_0_15px_rgba(250,204,21,0.5)]" />
                 <h2 className="text-4xl font-bold mb-2">Topic Mastered!</h2>
-                <p className="text-xl mb-6 text-white/80">You completed {topic}</p>
+                <p className="text-xl mb-6 opacity-80">You completed {topic}</p>
                 <div className="glass-panel p-6 rounded-2xl mb-8 min-w-[200px]">
-                    <div className="text-sm uppercase tracking-widest text-white/50 mb-1">Total Score</div>
-                    <div className="text-5xl font-bold text-cyan-300">{score}</div>
+                    <div className="text-sm uppercase tracking-widest opacity-50 mb-1">Total Score</div>
+                    <div className="text-5xl font-bold text-cyan-300">{score} <span className="text-2xl text-white/50">/ {questions.length * 2}</span></div>
                 </div>
                 <button onClick={onBack} className="glass-button px-8 py-3 rounded-full font-bold flex items-center gap-2">
                     <ArrowLeft size={20} /> Back to Topics
@@ -177,7 +196,7 @@ const TopicQuiz: React.FC<TopicQuizProps> = ({ userId, topic, userInterests, onB
             <div className="flex items-center justify-between mb-6">
                 <button onClick={onBack} className="p-2 hover:bg-white/10 rounded-full transition-colors"><ArrowLeft/></button>
                 <div className="flex flex-col items-end">
-                    <span className="text-xs text-white/50 uppercase tracking-widest">Question {currentIndex + 1} / {questions.length}</span>
+                    <span className="text-xs opacity-50 uppercase tracking-widest">Question {currentIndex + 1} / {questions.length}</span>
                     <div className="w-32 bg-white/10 h-1.5 rounded-full mt-1">
                         <div className="bg-cyan-400 h-full rounded-full transition-all duration-300" style={{width: `${((currentIndex + 1)/questions.length)*100}%`}}></div>
                     </div>
@@ -201,11 +220,15 @@ const TopicQuiz: React.FC<TopicQuizProps> = ({ userId, topic, userInterests, onB
                     let btnClass = "glass-button p-5 rounded-xl text-left transition-all hover:bg-white/10 border border-white/10 relative overflow-hidden group";
                     let icon = <div className="w-6 h-6 rounded-full border border-white/30 flex items-center justify-center text-xs group-hover:border-white/80">{String.fromCharCode(65 + i)}</div>;
                     
+                    // Robust check for styling
+                    const isSelected = selectedOption === opt;
+                    const isThisCorrect = normalize(opt) === normalize(currentQ.correctAnswer);
+
                     if (selectedOption) {
-                        if (opt === currentQ.correctAnswer) {
+                        if (isThisCorrect) {
                             btnClass = "bg-green-500/20 border-green-500 text-white shadow-[0_0_15px_rgba(34,197,94,0.3)]";
                             icon = <CheckCircle size={24} className="text-green-400" />;
-                        } else if (opt === selectedOption) {
+                        } else if (isSelected) {
                             btnClass = "bg-red-500/20 border-red-500 text-white opacity-80";
                             icon = <XCircle size={24} className="text-red-400" />;
                         } else {
@@ -220,9 +243,9 @@ const TopicQuiz: React.FC<TopicQuizProps> = ({ userId, topic, userInterests, onB
                             disabled={!!selectedOption}
                             className={btnClass}
                         >
-                            <div className="flex items-center gap-4 relative z-10">
+                            <div className="flex items-center gap-4 relative z-10 w-full">
                                 {icon}
-                                <span className="font-medium">{opt}</span>
+                                <span className="font-medium flex-1 whitespace-normal text-left">{opt}</span>
                             </div>
                         </button>
                     )
@@ -231,7 +254,7 @@ const TopicQuiz: React.FC<TopicQuizProps> = ({ userId, topic, userInterests, onB
 
             {/* Explanation */}
             {selectedOption && (
-                <div className="mt-6 animate-in slide-in-from-bottom-4 fade-in duration-300">
+                <div className="mt-6">
                     <div className={`p-4 rounded-xl border ${isCorrect ? 'bg-green-900/20 border-green-500/30' : 'bg-blue-900/20 border-blue-500/30'}`}>
                         <div className="flex items-center gap-2 mb-2 font-bold uppercase text-xs tracking-wider opacity-70">
                             {isCorrect ? <CheckCircle size={14} /> : <ArrowRight size={14}/>}

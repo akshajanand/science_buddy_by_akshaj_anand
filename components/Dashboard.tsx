@@ -7,6 +7,7 @@ import {
     Search, Headphones, Puzzle, Network, PenTool, BookOpen, FileText, 
     Clock, Activity, Star, Clapperboard
 } from 'lucide-react';
+import { Skeleton } from './Skeleton';
 
 interface DashboardProps {
     user: { id: string; username: string; interests: string };
@@ -19,6 +20,7 @@ interface DashboardProps {
 const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onResumeSession, onResumeTopic }) => {
     const [stats, setStats] = useState({ totalChats: 0, voiceSessions: 0 });
     const [userRank, setUserRank] = useState<number | string>('-');
+    const [loading, setLoading] = useState(true);
     
     // Jump Back In Data
     const [resumeTopics, setResumeTopics] = useState<any[]>([]);
@@ -27,6 +29,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onResumeSession
 
     useEffect(() => {
         const fetchDashboardData = async () => {
+            setLoading(true);
             // 1. Fetch Incomplete Topics (Limit 2)
             const { data: topicsData } = await supabase
                 .from('quiz_progress')
@@ -70,6 +73,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onResumeSession
                 const rank = usersData.findIndex(u => u.id === user.id) + 1;
                 setUserRank(rank > 0 ? rank : '-');
             }
+            setLoading(false);
         };
         fetchDashboardData();
     }, [user.id]);
@@ -124,6 +128,26 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onResumeSession
         { id: AppView.CONCEPT_MAP, title: 'Concept Map', icon: Network, desc: 'Visual Knowledge Graph' },
         { id: AppView.STYLE_SWAPPER, title: 'Style Swap', icon: PenTool, desc: 'Rewrite Boring Text' },
     ];
+
+    if (loading) {
+        return (
+            <div className="h-full overflow-y-auto custom-scrollbar p-4 md:p-8 space-y-8">
+                <Skeleton className="h-48 w-full rounded-3xl" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Skeleton className="h-32 rounded-2xl" />
+                    <Skeleton className="h-32 rounded-2xl" />
+                </div>
+                <div className="space-y-4">
+                    <Skeleton className="h-8 w-40" />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <Skeleton className="h-40 rounded-2xl" />
+                        <Skeleton className="h-40 rounded-2xl" />
+                        <Skeleton className="h-40 rounded-2xl" />
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="h-full overflow-y-auto custom-scrollbar p-4 md:p-8 space-y-8">

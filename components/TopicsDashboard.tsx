@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { BookOpen, CheckCircle, Circle, ArrowRight, RefreshCw, Loader2, Play } from 'lucide-react';
 import { TopicProgress } from '../types';
+import { Skeleton } from './Skeleton';
 
 interface TopicsDashboardProps {
     userId: string;
@@ -85,8 +86,10 @@ const TopicsDashboard: React.FC<TopicsDashboardProps> = ({ userId, onSelectTopic
             </div>
 
             {loading ? (
-                <div className="flex-1 flex items-center justify-center">
-                    <Loader2 size={48} className="animate-spin text-cyan-400" />
+                <div className="flex-1 overflow-y-auto custom-scrollbar grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-10">
+                    {[1, 2, 3, 4, 5, 6].map(i => (
+                        <Skeleton key={i} className="h-40 rounded-2xl" />
+                    ))}
                 </div>
             ) : (
                 <div className="flex-1 overflow-y-auto custom-scrollbar grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-10">

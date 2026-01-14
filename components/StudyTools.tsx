@@ -1,20 +1,11 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Mic, CheckCircle, Brain, Volume2, Search, StopCircle, Atom, Puzzle, RefreshCw, Gauge, Podcast, Radio, Trophy, Play, Pause, Download, RotateCcw, List, Save, Trash2, Library, X, Loader2, Headphones, Zap, ArrowRight, ArrowLeft, Grid, XCircle } from 'lucide-react';
-import { generateQuizQuestions, generateWordPuzzle, generateStudyPodSummary, generateMatchingPairs, generatePodcastScript } from '../services/aiService';
+import { generateQuizQuestions, generateWordPuzzle, generateStudyPodSummary, generateMatchingPairs, generatePodcastScript, checkAndAwardDailyXP } from '../services/aiService';
 import { QuizQuestion, PuzzleWord, MatchCard, PodcastSegment, StudyItem } from '../types';
 import { speechManager } from '../utils/audioUtils';
 import { supabase } from '../services/supabaseClient';
 import { showToast } from '../utils/notificationUtils';
-
-// Helper for AI XP Reward
-const awardXP = async (userId: string, amount: number, activity: string) => {
-    try {
-        await supabase.rpc('increment_score', { row_id: userId, points: amount });
-        showToast(`AI Reward: +${amount} XP for ${activity}! 🌟`, 'success');
-    } catch (e) {
-        console.error("XP Error", e);
-    }
-};
 
 // --- Mind Match Component ---
 export const MindMatch: React.FC = () => {
@@ -69,7 +60,7 @@ export const MindMatch: React.FC = () => {
                 const newM = m + 1;
                 // Game Over Check
                 if (newM === cards.length / 2) {
-                     if (userId) awardXP(userId, 50, "Completing Mind Match");
+                     if (userId) checkAndAwardDailyXP(userId, 15, "Mind Match Completion");
                 }
                 return newM;
             });
@@ -148,8 +139,8 @@ export const StudyPod: React.FC<StudyPodProps> = ({ userId }) => {
         if (!error && data) {
             setSavedItems(prev => [data, ...prev]);
             showToast("Saved to Library!", 'success');
-            // Award XP
-            awardXP(userId, 10, "Saving Study Pod");
+            // Award XP - Limit to once a day per activity type "SavePod"
+            checkAndAwardDailyXP(userId, 15, "Saving Study Pod");
         } else {
             console.error(error);
             showToast("Failed to save: " + error.message, 'error');
@@ -181,7 +172,7 @@ export const StudyPod: React.FC<StudyPodProps> = ({ userId }) => {
             setPlaying(true);
         }
         
-        if (userId) awardXP(userId, 15, "Generating Study Pod");
+        if (userId) checkAndAwardDailyXP(userId, 15, "Generating Study Pod");
         setLoading(false);
     };
 
@@ -410,11 +401,17 @@ export const QuizModule: React.FC = () => {
         setLoading(false);
     };
 
+    const normalize = (text: string) => text ? text.trim().toLowerCase() : '';
+
     const handleAnswer = (option: string) => {
         if (selectedOption) return;
         setSelectedOption(option);
-        const correct = option === questions[currentIndex].correctAnswer;
+        
+        // Robust comparison
+        const currentQ = questions[currentIndex];
+        const correct = normalize(option) === normalize(currentQ.correctAnswer);
         setIsCorrect(correct);
+        
         if (correct) {
             setScore(s => s + 1);
         }
@@ -426,9 +423,9 @@ export const QuizModule: React.FC = () => {
                 setIsCorrect(null);
             } else {
                 setQuizComplete(true);
-                // Award XP based on final score
+                // Award XP based on final score - Limit daily
                 const finalScore = isCorrect ? score + 1 : score;
-                if (userId) awardXP(userId, finalScore * 2, "Flash Quiz Performance");
+                if (userId) checkAndAwardDailyXP(userId, finalScore * 2, "Flash Quiz Performance");
             }
         }, 1500);
     };
@@ -510,11 +507,14 @@ export const QuizModule: React.FC = () => {
                     let btnClass = "glass-button p-5 rounded-xl text-left transition-all hover:bg-white/10 border border-white/10 relative overflow-hidden group";
                     let icon = <div className="w-6 h-6 rounded-full border border-white/30 flex items-center justify-center text-xs group-hover:border-white/80">{String.fromCharCode(65 + i)}</div>;
                     
+                    const isSelected = selectedOption === opt;
+                    const isThisCorrect = normalize(opt) === normalize(currentQ.correctAnswer);
+
                     if (selectedOption) {
-                        if (opt === currentQ.correctAnswer) {
+                        if (isThisCorrect) {
                             btnClass = "bg-green-500/20 border-green-500 text-white shadow-[0_0_15px_rgba(34,197,94,0.3)]";
                             icon = <CheckCircle size={24} className="text-green-400" />;
-                        } else if (opt === selectedOption) {
+                        } else if (isSelected) {
                             btnClass = "bg-red-500/20 border-red-500 text-white opacity-80";
                             icon = <XCircle size={24} className="text-red-400" />;
                         } else {
@@ -529,9 +529,9 @@ export const QuizModule: React.FC = () => {
                             disabled={!!selectedOption}
                             className={btnClass}
                         >
-                            <div className="flex items-center gap-4 relative z-10">
+                            <div className="flex items-center gap-4 relative z-10 w-full">
                                 {icon}
-                                <span className="font-medium">{opt}</span>
+                                <span className="font-medium flex-1 whitespace-normal text-left">{opt}</span>
                             </div>
                         </button>
                     )
@@ -654,11 +654,11 @@ export const WordPuzzle: React.FC = () => {
                 const newFoundCount = foundCount + 1;
                 setFoundCount(newFoundCount);
                 
-                // XP REWARD
-                if (userId) awardXP(userId, 5, "Word Found");
+                // XP REWARD - Small XP for finding words
+                if (userId) checkAndAwardDailyXP(userId, 5, "Word Found");
                 
                 if (newFoundCount === words.length && userId) {
-                    awardXP(userId, 50, "Completed Word Puzzle");
+                    checkAndAwardDailyXP(userId, 50, "Completed Word Puzzle");
                 }
 
                 setSelectedCells([]);

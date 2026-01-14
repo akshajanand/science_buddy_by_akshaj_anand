@@ -33,7 +33,7 @@ interface UserData {
     avatar_url?: string;
     display_name?: string;
     ui_theme?: string;
-    sidebar_dock?: 'LEFT' | 'RIGHT' | 'TOP' | 'BOTTOM'; // New Field
+    sidebar_dock?: 'LEFT' | 'RIGHT' | 'TOP' | 'BOTTOM';
     custom_ai_behavior?: string;
 }
 
@@ -149,7 +149,7 @@ const App: React.FC = () => {
     setLoading(true);
     setLoadingStage(0);
     
-    const totalDuration = 2000; // Quick load since animations are removed
+    const totalDuration = 6500; // 6.5s
     
     const step1 = totalDuration * 0.15;
     const step2 = totalDuration * 0.15;
@@ -285,7 +285,7 @@ const App: React.FC = () => {
             {
                 from_name: user?.username || 'User',
                 user_email: feedbackEmail || 'Not Provided',
-                message: `Username: ${user?.username}\nEmail: ${feedbackEmail}\n\n${feedbackText}`,
+                message: `User: @${user?.username}\nEmail: ${feedbackEmail}\n\n${feedbackText}`,
                 reply_to: feedbackEmail || 'No Reply'
             },
             'X1eYkPAczlxtDVjnw'
@@ -517,7 +517,7 @@ const App: React.FC = () => {
                       <div>
                           <label className="text-xs font-bold mb-1 block">DISPLAY NAME (Optional)</label>
                           <input 
-                              className="w-full bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-sm focus:border-cyan-400 outline-none transition-colors" 
+                              className="w-full bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-sm focus:border-cyan-400 outline-none transition-colors"
                               placeholder={`Defaults to @${user.username}`}
                               value={settingsName}
                               onChange={(e) => setSettingsName(e.target.value)}
@@ -570,7 +570,7 @@ const App: React.FC = () => {
                       <div>
                           <label className="text-xs font-bold mb-1 block">CUSTOM INSTRUCTIONS</label>
                           <textarea 
-                              className="w-full h-24 bg-white/10 border border-white/10 rounded-lg p-3 text-sm focus:border-purple-400 outline-none transition-colors resize-none" 
+                              className="w-full h-24 bg-white/10 border border-white/10 rounded-lg p-3 text-sm focus:border-purple-400 outline-none transition-colors resize-none"
                               placeholder="e.g. 'Explain things like I am 5', 'Be sarcastic but helpful', 'Always use soccer analogies'."
                               value={settingsAIBehavior}
                               onChange={(e) => setSettingsAIBehavior(e.target.value)}
@@ -586,7 +586,7 @@ const App: React.FC = () => {
                           <label className="text-xs font-bold mb-1 block">CHANGE PASSWORD</label>
                           <input 
                               type="password"
-                              className="w-full bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-sm focus:border-red-400 outline-none transition-colors" 
+                              className="w-full bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-sm focus:border-red-400 outline-none transition-colors"
                               placeholder="Enter new password to change"
                               value={settingsPassword}
                               onChange={(e) => setSettingsPassword(e.target.value)}

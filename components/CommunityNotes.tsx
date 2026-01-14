@@ -1,8 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { Upload, FileText, Loader2, Search, X, User, Image, FileType, Plus, CheckCircle } from 'lucide-react';
 import { CommunityNote } from '../types';
 import { showToast } from '../utils/notificationUtils';
+import { Skeleton } from './Skeleton';
 
 interface CommunityNotesProps {
     userId: string;
@@ -259,7 +261,13 @@ const CommunityNotes: React.FC<CommunityNotesProps> = ({ userId, username }) => 
             )}
 
             {/* Notes Grid */}
-            {loading ? <div className="flex justify-center h-full items-center"><Loader2 className="animate-spin text-cyan-400" size={48} /></div> : (
+            {loading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto custom-scrollbar pb-10">
+                    {[1, 2, 3, 4, 5, 6].map(i => (
+                        <Skeleton key={i} className="h-40 rounded-xl" />
+                    ))}
+                </div>
+            ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto custom-scrollbar pb-10">
                     {notes.map(note => (
                         <div 

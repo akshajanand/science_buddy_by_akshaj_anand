@@ -1,6 +1,8 @@
+
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { Trophy, Medal, Crown, User } from 'lucide-react';
+import { Skeleton } from './Skeleton';
 
 interface LeaderboardProps {
     currentUserId: string;
@@ -67,7 +69,11 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ currentUserId, currentUserPoi
                 </div>
                 
                 {loading ? (
-                    <div className="p-8 text-center opacity-30 animate-pulse">Loading ranks...</div>
+                    <div className="p-4 space-y-4">
+                        {[1, 2, 3, 4, 5].map(i => (
+                            <Skeleton key={i} className="h-14 w-full" />
+                        ))}
+                    </div>
                 ) : (
                     users.length === 0 ? (
                         <div className="p-8 text-center opacity-30">

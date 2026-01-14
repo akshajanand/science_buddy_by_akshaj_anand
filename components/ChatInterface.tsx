@@ -1,9 +1,11 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, Plus, MessageSquare, Trash2, Bot, User, Settings, X, Save, History, Sparkles } from 'lucide-react';
 import { ChatSession, ChatMessage } from '../types';
 import { chatWithAI, generateTitle, fetchLiveUserStats } from '../services/aiService';
 import { supabase } from '../services/supabaseClient';
 import { renderRichText } from '../utils/textUtils';
+import { Skeleton } from './Skeleton';
 
 interface ChatInterfaceProps {
     userProfile: { name?: string | null, interests?: string };
@@ -18,6 +20,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userProfile, onUpdateProf
   const [currentSessionId, setCurrentSessionId] = useState<string | null>('new');
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(true);
   // Settings removed from here, moved to App.tsx
   const [showHistoryMobile, setShowHistoryMobile] = useState(false);
 
@@ -28,6 +31,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userProfile, onUpdateProf
     if (!userId) return;
 
     const loadChats = async () => {
+        setLoadingHistory(true);
         const { data } = await supabase
             .from('chat_sessions')
             .select('*')
@@ -49,6 +53,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userProfile, onUpdateProf
         } else {
             setCurrentSessionId('new');
         }
+        setLoadingHistory(false);
     }
     loadChats();
   }, [userId, initialSessionId]);
@@ -225,29 +230,32 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userProfile, onUpdateProf
         </button>
 
         <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2">
-          {displayedSessions.length === 0 && (
+          {loadingHistory ? (
+              [1, 2, 3, 4].map(i => <Skeleton key={i} className="h-12 w-full rounded-xl" />)
+          ) : displayedSessions.length === 0 ? (
               <div className="text-center opacity-40 mt-10 text-sm">
                   No text chats yet.
               </div>
+          ) : (
+              displayedSessions.map(session => (
+                <div 
+                  key={session.id}
+                  onClick={() => {
+                      setCurrentSessionId(session.id);
+                      setShowHistoryMobile(false);
+                  }}
+                  className={`p-3 rounded-xl cursor-pointer flex items-center justify-between group transition-all ${currentSessionId === session.id ? 'bg-white/20 border border-white/30' : 'hover:bg-white/10'}`}
+                >
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    <MessageSquare size={16} className="shrink-0 opacity-70" />
+                    <span className="truncate text-sm opacity-90">{session.title}</span>
+                  </div>
+                  <button onClick={(e) => deleteSession(e, session.id)} className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-300 transition-opacity">
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))
           )}
-          {displayedSessions.map(session => (
-            <div 
-              key={session.id}
-              onClick={() => {
-                  setCurrentSessionId(session.id);
-                  setShowHistoryMobile(false);
-              }}
-              className={`p-3 rounded-xl cursor-pointer flex items-center justify-between group transition-all ${currentSessionId === session.id ? 'bg-white/20 border border-white/30' : 'hover:bg-white/10'}`}
-            >
-              <div className="flex items-center gap-3 overflow-hidden">
-                <MessageSquare size={16} className="shrink-0 opacity-70" />
-                <span className="truncate text-sm opacity-90">{session.title}</span>
-              </div>
-              <button onClick={(e) => deleteSession(e, session.id)} className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-300 transition-opacity">
-                <Trash2 size={14} />
-              </button>
-            </div>
-          ))}
         </div>
         
         {/* Personalize Button Removed Here */}

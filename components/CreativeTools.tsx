@@ -1,18 +1,11 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { BookOpen, Sparkles, Network, ArrowRight, X, Info, Plus, ChevronLeft, GitBranch, Layers, Save, Trash2, History, Layout, Loader2, Move, Maximize, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
-import { generateStoryNode, rewriteText, generateConceptMapData } from '../services/aiService';
+import { generateStoryNode, rewriteText, generateConceptMapData, checkAndAwardDailyXP } from '../services/aiService';
 import { StoryNode, ConceptNode } from '../types';
 import { renderRichText } from '../utils/textUtils';
 import { supabase } from '../services/supabaseClient';
 import { showToast } from '../utils/notificationUtils';
-
-// Helper for AI XP Reward (duplicated for safety in this module)
-const awardXP = async (userId: string, amount: number, activity: string) => {
-    try {
-        await supabase.rpc('increment_score', { row_id: userId, points: amount });
-        showToast(`AI Reward: +${amount} XP for ${activity}! 🌟`, 'success');
-    } catch (e) { console.error(e); }
-};
 
 // --- Story Component ---
 export const InteractiveStory: React.FC = () => {
@@ -36,7 +29,7 @@ export const InteractiveStory: React.FC = () => {
         setNode({ ...data, id: 'start' });
         setHistory(data.text);
         setStarted(true);
-        if (userId) awardXP(userId, 5, "Starting Adventure");
+        if (userId) checkAndAwardDailyXP(userId, 5, "Starting Adventure");
     }
     setLoading(false);
   };
@@ -47,7 +40,7 @@ export const InteractiveStory: React.FC = () => {
     if (data) {
         setNode({ ...data, id: Date.now().toString() });
         setHistory(prev => prev + "\n" + data.text);
-        if (userId) awardXP(userId, 2, "Story Decision");
+        if (userId) checkAndAwardDailyXP(userId, 2, "Story Decision");
     }
     setLoading(false);
   };
@@ -271,7 +264,7 @@ export const ConceptMap: React.FC<ConceptMapProps> = ({ userId, overrideData }) 
             const result = await generateConceptMapData(searchTopic);
             if (result && result.root && Array.isArray(result.children)) {
                 setData(result);
-                if (userId) awardXP(userId, 15, "Generating Concept Map");
+                if (userId) checkAndAwardDailyXP(userId, 15, "Generating Concept Map");
             }
         } catch (e) { console.error(e); }
         setLoading(false);
@@ -290,7 +283,7 @@ export const ConceptMap: React.FC<ConceptMapProps> = ({ userId, overrideData }) 
         } else if (savedEntry) {
             setSavedMaps(prev => [savedEntry, ...prev]);
             showToast("Map saved successfully", 'success');
-            awardXP(userId, 5, "Saving Map");
+            checkAndAwardDailyXP(userId, 15, "Saving Map");
         }
         setSaving(false);
     };
@@ -321,7 +314,7 @@ export const ConceptMap: React.FC<ConceptMapProps> = ({ userId, overrideData }) 
                 setData(result);
                 setSelectedNode(null);
                 resetView();
-                if (userId) awardXP(userId, 5, "Deep Dive");
+                if (userId) checkAndAwardDailyXP(userId, 5, "Deep Dive");
             }
         } catch(e) { console.error(e); }
         setLoading(false);
