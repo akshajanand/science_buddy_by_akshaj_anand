@@ -193,7 +193,7 @@ const TopicQuiz: React.FC<TopicQuizProps> = ({ userId, topic, userInterests, onB
     if (!currentQ) return <div className="p-4">Error loading question. <button onClick={onBack}>Back</button></div>;
 
     return (
-        <div className="h-full flex flex-col p-4 md:p-8 max-w-4xl mx-auto">
+        <div className="h-full flex flex-col p-4 md:p-8 max-w-4xl mx-auto overflow-y-auto custom-scrollbar">
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
                 <button onClick={onBack} className="p-2 hover:bg-white/10 rounded-full transition-colors"><ArrowLeft/></button>

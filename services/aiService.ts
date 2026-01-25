@@ -124,26 +124,33 @@ export const checkAndAwardDailyXP = async (userId: string, amount: number, activ
 
 // --- PROMPTS & FEATURES ---
 
-const CLASS_8_SYSTEM_PROMPT = `
-You are "Science Buddy", a highly personalized AI tutor for Class 8 Science students.
-RULES:
-1. **Context Aware**: Use provided student profile/stats.
-2. **Socratic**: Guide them, don't just lecture.
-3. **Tone**: Enthusiastic, Relatable, Encouraging. Use emojis.
+const NCERT_SYSTEM_PROMPT = `
+You are "Science Buddy", a friendly and personalized AI tutor strictly for CBSE/NCERT Science students (Classes 6, 7, and 8).
+
+*** STRICT CONTENT BOUNDARIES ***
+1. **Source Material**: You must ONLY refer to the NCERT Science Textbooks. Do not introduce concepts, formulas, or terminology from higher grades (9-12) or college level.
+2. **Difficulty Level**: Keep explanations simple, concrete, and age-appropriate.
+   - For Class 6: Very basic, observational, fun.
+   - For Class 7: slightly more detailed but simple terms.
+   - For Class 8: Conceptual but strictly within the syllabus.
+3. **Tone**: Enthusiastic, Relatable, Socratic (ask questions to guide them), and Encouraging. Use emojis 🌟.
+4. **No Hallucinations**: If a topic is not in the NCERT book, politely say it's advanced and explain the basic version found in their book.
 `;
 
 const VOICE_SYSTEM_PROMPT = `
-You are "Science Buddy", speaking directly to a Class 8 student via a voice call.
+You are "Science Buddy", speaking directly to a middle school student (Class 6-8) via a voice call.
 RULES:
 1. **NO VISUALS**: Output is for Text-to-Speech only.
 2. **Conversational**: Speak like a human friend.
-3. **Concise**: Short answers (1-2 sentences max unless explained).
+3. **Simple Language**: Use simple English. Avoid complex jargon unless it's a key NCERT definition.
+4. **Concise**: Short answers (1-2 sentences max unless explained).
 `;
 
 export interface LiveUserContext {
     name?: string | null;
     interests?: string;
     customBehavior?: string; 
+    classLevel?: string;
     stats?: {
         rank: string | number;
         totalPoints: number;
@@ -158,7 +165,7 @@ export interface LiveUserContext {
 export const fetchLiveUserStats = async (userId: string) => {
     try {
         const [userRes, quizRes, researchRes, libraryRes, notesRes, allUsersRes] = await Promise.all([
-            supabase.from('users').select('total_points, custom_ai_behavior').eq('id', userId).single(),
+            supabase.from('users').select('total_points, custom_ai_behavior, class_level').eq('id', userId).single(),
             supabase.from('quiz_progress').select('topic, score').eq('user_id', userId).order('updated_at', {ascending: false}).limit(5),
             supabase.from('research_projects').select('title').eq('user_id', userId).order('created_at', {ascending: false}).limit(3),
             supabase.from('study_library').select('topic').eq('user_id', userId).order('created_at', {ascending: false}).limit(3),
@@ -178,6 +185,7 @@ export const fetchLiveUserStats = async (userId: string) => {
             rank,
             totalPoints: userRes.data?.total_points || 0,
             customBehavior: userRes.data?.custom_ai_behavior || "",
+            classLevel: userRes.data?.class_level || "8",
             totalStudents,
             recentQuizScores: quizRes.data || [],
             researchTopics: researchRes.data?.map(r => r.title) || [],
@@ -194,17 +202,18 @@ export const analyzeUserProfile = async (data: any) => {
 };
 
 export const chatWithAI = async (message: string, history: any[], userContext: LiveUserContext) => {
-  let systemInstruction = CLASS_8_SYSTEM_PROMPT;
+  let systemInstruction = NCERT_SYSTEM_PROMPT;
   const name = userContext.name || "Student";
   const interests = userContext.interests || "General Science";
+  const grade = userContext.classLevel || "8";
   
-  let statsContext = "";
+  systemInstruction += `\n\nCURRENT STUDENT CONTEXT:\n- Class: ${grade} (Strictly adhere to this grade's NCERT level)\n- Name: ${name}\n- Interests: ${interests}`;
+
   if (userContext.stats) {
-      statsContext = `\nSTUDENT DATA:\n- Rank: #${userContext.stats.rank}\n- Recent Quizzes: ${JSON.stringify(userContext.stats.recentQuizScores)}`;
+      systemInstruction += `\n- Recent Activity: ${JSON.stringify(userContext.stats.recentQuizScores)}`;
   }
 
   if (userContext.customBehavior) systemInstruction += `\n\nUSER CUSTOM INSTRUCTION: "${userContext.customBehavior}"`;
-  systemInstruction += `\n\nPROFILE: Name: ${name}, Interests: ${interests}.${statsContext}`;
 
   const messages = [{ role: "system", content: systemInstruction }, ...history.map(h => ({ role: h.role === 'model' ? "assistant" : "user", content: h.text })), { role: "user", content: message }];
   const response = await callGroqAPI(messages, false);
@@ -214,7 +223,7 @@ export const chatWithAI = async (message: string, history: any[], userContext: L
 export const chatWithAIVoice = async (message: string, history: any[], userContext: LiveUserContext) => {
   let systemInstruction = VOICE_SYSTEM_PROMPT;
   if (userContext.name) systemInstruction += `\nUser Name: ${userContext.name}`;
-  if (userContext.interests) systemInstruction += `\nInterests: ${userContext.interests}`;
+  if (userContext.classLevel) systemInstruction += `\nStudent Class: ${userContext.classLevel} (Keep explanations simple and NCERT aligned).`;
 
   const messages = [{ role: "system", content: systemInstruction }, ...history.map(h => ({ role: h.role === 'model' ? "assistant" : "user", content: h.text })), { role: "user", content: message }];
   const response = await callGroqAPI(messages, false, 0.9);
@@ -229,7 +238,8 @@ export const generateTitle = async (message: string) => {
 
 export const generateStoryNode = async (history: string, choice?: string | null, topic?: string) => {
     const prompt = `
-    Interactive Science Story.
+    Interactive Science Story for Middle School (Class 6-8).
+    Strictly keep scientific concepts within NCERT limits.
     Topic: ${topic || 'Continuing the story'}.
     History: ${history}
     User Choice: ${choice || 'Start'}
@@ -246,37 +256,40 @@ export const generateStoryNode = async (history: string, choice?: string | null,
 };
 
 export const rewriteText = async (text: string, style: string) => {
-    const prompt = `Rewrite the following text in the style of ${style}:\n\n"${text}"`;
+    const prompt = `Rewrite the following text in the style of ${style}. Keep it simple and understandable for a Class 8 student:\n\n"${text}"`;
     return await callGroqAPI([{ role: "user", content: prompt }]) || "Failed to rewrite.";
 };
 
 export const generateConceptMapData = async (topic: string) => {
-    const prompt = `Generate a concept map for "${topic}" in JSON format.
+    const prompt = `Generate a simple concept map for "${topic}" in JSON format. Use terms found in NCERT Science textbooks.
     { "root": {"label": "${topic}", "description": "short desc"}, "children": [{"label": "Subconcept", "description": "desc"}] }`;
     const res = await callGroqAPI([{ role: "user", content: prompt }], true);
     return cleanAndParseJSON(res);
 };
 
 export const generateMatchingPairs = async (topic: string): Promise<MatchingPair[]> => {
-    const prompt = `Generate 6 matching pairs (term and definition) for topic: ${topic}. JSON Format: { "pairs": [{ "id": "1", "term": "...", "definition": "..." }] }`;
+    const prompt = `Generate 6 matching pairs (term and definition) for topic: ${topic}. STRICTLY NCERT LEVEL (Class 6-8). JSON Format: { "pairs": [{ "id": "1", "term": "...", "definition": "..." }] }`;
     const res = await callGroqAPI([{ role: "user", content: prompt }], true);
     return cleanAndParseJSON(res)?.pairs || [];
 };
 
 export const generateStudyPodSummary = async (topic: string) => {
-    const prompt = `Write a concise, engaging audio summary script about ${topic} for a student. Max 150 words.`;
+    const prompt = `Write a concise, engaging audio summary script about ${topic} for a middle school student. Max 150 words. Use simple language.`;
     return await callGroqAPI([{ role: "user", content: prompt }]) || "";
 };
 
 export const generatePodcastScript = async (topic: string): Promise<PodcastSegment[]> => {
     const prompt = `Create a 2-person podcast script about ${topic}. Host 1 is Ms. Rachel (Teacher), Host 2 is Rohan (Student). 
+    Keep the content strictly within NCERT Class 6-8 science level.
     JSON Format: { "script": [ {"speaker": "Host 1", "text": "..."}, {"speaker": "Host 2", "text": "..."} ] }`;
     const res = await callGroqAPI([{ role: "user", content: prompt }], true);
     return cleanAndParseJSON(res)?.script || [];
 };
 
 export const generateQuizQuestions = async (topic: string, count: number, interests: string, seed?: string): Promise<QuizQuestion[]> => {
-    const prompt = `Generate ${count} multiple choice questions for Class 8 Science on topic: "${topic}".
+    const prompt = `Generate ${count} multiple choice questions for Middle School Science on topic: "${topic}".
+    CRITICAL: Questions must be strictly based on the NCERT textbook content. DO NOT ask questions outside the syllabus.
+    Difficulty: Easy to Medium.
     Context: Student likes ${interests}.
     Output JSON: { "questions": [ { "question": "...", "options": ["A","B","C","D"], "correctAnswer": "A", "explanation": "..." } ] }`;
     const res = await callGroqAPI([{ role: "user", content: prompt }], true);
@@ -284,7 +297,7 @@ export const generateQuizQuestions = async (topic: string, count: number, intere
 };
 
 export const generateWordPuzzle = async (topic: string): Promise<PuzzleWord[]> => {
-    const prompt = `Generate 8 scientific terms related to ${topic} for a word search. JSON: { "words": [ {"word": "ATOM", "clue": "Basic unit of matter"} ] }`;
+    const prompt = `Generate 8 scientific terms related to ${topic} for a word search. Use only terms found in NCERT textbooks. JSON: { "words": [ {"word": "ATOM", "clue": "Basic unit of matter"} ] }`;
     const res = await callGroqAPI([{ role: "user", content: prompt }], true);
     return cleanAndParseJSON(res)?.words || [];
 };
@@ -295,18 +308,18 @@ export const generateResearchTitle = async (text: string) => {
 };
 
 export const generateSummaryFromText = async (text: string) => {
-    const prompt = `Summarize this text in bullet points: ${text.substring(0, 5000)}`;
+    const prompt = `Summarize this text in bullet points suitable for a Class 8 student. Simple words: ${text.substring(0, 5000)}`;
     return await callGroqAPI([{ role: "user", content: prompt }]) || "Summary unavailable.";
 };
 
 export const generateQuizFromText = async (text: string) => {
-    const prompt = `Generate 5 quiz questions based on this text. JSON format same as before. Text: ${text.substring(0, 5000)}`;
+    const prompt = `Generate 5 simple quiz questions based on this text. JSON format same as before. Text: ${text.substring(0, 5000)}`;
     const res = await callGroqAPI([{ role: "user", content: prompt }], true);
     return cleanAndParseJSON(res)?.questions || [];
 };
 
 export const generatePodcastScriptFromText = async (text: string) => {
-    const prompt = `Convert this text into a dialogue script between a Teacher and Student. JSON format: { "script": [...] }. Text: ${text.substring(0, 5000)}`;
+    const prompt = `Convert this text into a simple dialogue script between a Teacher and Student (Class 8 level). JSON format: { "script": [...] }. Text: ${text.substring(0, 5000)}`;
     const res = await callGroqAPI([{ role: "user", content: prompt }], true);
     return cleanAndParseJSON(res)?.script || [];
 };
@@ -323,7 +336,7 @@ export const generatePerformanceReport = async (username: string, interests: str
     const prompt = `
     Generate a motivational performance report for student ${username} (Interests: ${interests}).
     Stats: ${JSON.stringify(stats)}.
-    Keep it under 200 words. Use formatting.
+    Keep it under 200 words. Focus on their progress in Class 8 Science.
     `;
     return await callGroqAPI([{ role: "user", content: prompt }]) || "Analysis unavailable.";
 };
@@ -331,8 +344,9 @@ export const generatePerformanceReport = async (username: string, interests: str
 export const createVideoProject = async (topic: string): Promise<VideoSlide[]> => {
     const prompt = `
     Create a 5-slide video script for "${topic}".
+    Level: NCERT Class 6-8 Science.
     For each slide, provide:
-    1. 'text': The narration script (max 30 words).
+    1. 'text': The narration script (max 30 words, simple language).
     2. 'keyword': A single visual keyword to search for an image (e.g. "volcano", "microscope").
     
     JSON Format: { "slides": [ {"text": "...", "keyword": "..."} ] }

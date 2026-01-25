@@ -314,7 +314,11 @@ const App: React.FC = () => {
                 onScoreUpdate={() => {}} 
             />;
         }
-        return <TopicsDashboard userId={user!.id} onSelectTopic={setSelectedTopic} />;
+        return <TopicsDashboard 
+            userId={user!.id} 
+            userClass={user!.class_level} 
+            onSelectTopic={setSelectedTopic} 
+        />;
     }
 
     switch (currentView) {
@@ -489,7 +493,32 @@ const App: React.FC = () => {
                               <label className="text-xs font-bold mb-1 block">DISPLAY NAME</label>
                               <input className="w-full bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-sm" value={settingsName} onChange={(e) => setSettingsName(e.target.value)} />
                           </div>
+                          <div>
+                              <label className="text-xs font-bold mb-1 block">NEW PASSWORD</label>
+                              <input 
+                                  type="password" 
+                                  className="w-full bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-sm" 
+                                  placeholder="Enter new password (leave blank to keep)" 
+                                  value={settingsPassword} 
+                                  onChange={(e) => setSettingsPassword(e.target.value)} 
+                              />
+                          </div>
                       </div>
+
+                      <div className="space-y-4">
+                          <h3 className="text-sm font-bold uppercase tracking-widest opacity-50 flex items-center gap-2 text-purple-200"><Brain size={14}/> AI Persona</h3>
+                          <div>
+                              <label className="text-xs font-bold mb-1 block">CUSTOM INSTRUCTIONS</label>
+                              <textarea 
+                                  className="w-full bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-sm h-24 resize-none focus:border-purple-400 focus:outline-none" 
+                                  placeholder="e.g. Speak like a pirate, or explain things using football analogies..." 
+                                  value={settingsAIBehavior} 
+                                  onChange={(e) => setSettingsAIBehavior(e.target.value)} 
+                              />
+                              <p className="text-[10px] opacity-50 mt-1">This guides how Science Buddy talks to you.</p>
+                          </div>
+                      </div>
+
                       <div className="space-y-4">
                           <h3 className="text-sm font-bold uppercase tracking-widest opacity-50 flex items-center gap-2 text-green-200"><Layout size={14}/> Layout</h3>
                           <div>

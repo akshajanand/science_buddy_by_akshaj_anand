@@ -148,7 +148,7 @@ const CommunityNotes: React.FC<CommunityNotesProps> = ({ userId, username, readO
 
     return (
         <div className="h-full flex flex-col p-6 relative">
-            <div className="flex justify-between items-end mb-6">
+            <div className="flex justify-between items-end mb-6 shrink-0">
                 <div>
                     <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-orange-300 to-pink-300">
                         {filterByUserId ? "Student Portfolio" : "Community Notes"}
@@ -267,13 +267,13 @@ const CommunityNotes: React.FC<CommunityNotesProps> = ({ userId, username, readO
 
             {/* Notes Grid */}
             {loading ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto custom-scrollbar pb-10">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto custom-scrollbar pb-10 flex-1 min-h-0">
                     {[1, 2, 3, 4, 5, 6].map(i => (
                         <Skeleton key={i} className="h-40 rounded-xl" />
                     ))}
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto custom-scrollbar pb-10">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto custom-scrollbar pb-10 flex-1 min-h-0">
                     {notes.length === 0 && <div className="col-span-full text-center opacity-50 py-10">No notes found.</div>}
                     {notes.map(note => (
                         <div 

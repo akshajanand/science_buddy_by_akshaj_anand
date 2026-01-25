@@ -331,14 +331,14 @@ const ResearchMode: React.FC<ResearchModeProps> = ({ userId, username }) => {
 
     if (view === 'LIST') return (
         <div className="h-full flex flex-col p-6">
-             <div className="mb-8 flex justify-between items-end">
+             <div className="mb-8 flex justify-between items-end shrink-0">
                 <div><h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-300 to-indigo-300 mb-2">Research Lab</h2><p className="text-white/60">Analyze documents with AI.</p></div>
                 <label className="cursor-pointer glass-button px-6 py-3 rounded-xl flex items-center gap-2 font-bold bg-blue-600/20 hover:bg-blue-600/40 text-blue-100 border-blue-500/30">
                     {processingFile ? <Loader2 className="animate-spin" /> : <Upload size={20} />} <span>Upload Note / Doc</span>
                     <input type="file" accept=".pdf,.txt,.png,.jpg" className="hidden" onChange={handleFileUpload} disabled={processingFile} />
                 </label>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 overflow-y-auto custom-scrollbar pb-10">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 overflow-y-auto custom-scrollbar pb-10 flex-1 min-h-0">
                 {researches.map(r => (
                     <div key={r.id} onClick={() => { setCurrentProject(r); setView('WORKSPACE'); setActiveTab('SUMMARY'); speechManager.stop(); }} className="glass-panel p-6 rounded-2xl group cursor-pointer hover:bg-white/5 transition-all relative">
                         <button onClick={(e) => handleDeleteProject(e, r.id)} className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 p-2 hover:bg-red-500/20 rounded-lg text-red-300"><Trash2 size={16} /></button>
@@ -352,16 +352,16 @@ const ResearchMode: React.FC<ResearchModeProps> = ({ userId, username }) => {
 
     return (
         <div className="h-full flex flex-col p-4 md:p-6 relative">
-            <div className="flex items-center gap-4 mb-6">
+            <div className="flex items-center gap-4 mb-6 shrink-0">
                 <button onClick={() => setView('LIST')} className="p-2 glass-button rounded-lg"><ChevronLeft /></button>
                 <div className="flex-1"><h2 className="text-xl font-bold">{currentProject?.title}</h2></div>
             </div>
-            <div className="flex gap-2 overflow-x-auto pb-2 mb-4">
+            <div className="flex gap-2 overflow-x-auto pb-2 mb-4 shrink-0">
                 {[ { id: 'SUMMARY', icon: FileText, label: 'Summary' }, { id: 'CHAT', icon: MessageSquare, label: 'Chat' }, { id: 'QUIZ', icon: Zap, label: 'Quiz' }, { id: 'GRAPH', icon: Network, label: 'Infographic' }, { id: 'PODCAST', icon: Headphones, label: 'Podcast' } ].map(tab => (
                     <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold whitespace-nowrap ${activeTab === tab.id ? 'bg-white text-black' : 'glass-button text-white/70'}`}><tab.icon size={18} /> {tab.label}</button>
                 ))}
             </div>
-            <div className="flex-1 glass-panel rounded-2xl overflow-hidden relative border-white/10 bg-black/20 flex flex-col">
+            <div className="flex-1 glass-panel rounded-2xl overflow-hidden relative border-white/10 bg-black/20 flex flex-col min-h-0">
                 {isGenerating && <div className="absolute inset-0 z-50 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center"><Loader2 size={48} className="text-cyan-400 animate-spin" /><p className="font-bold animate-pulse">Generating...</p></div>}
                 
                 {activeTab === 'SUMMARY' && (
@@ -388,7 +388,7 @@ const ResearchMode: React.FC<ResearchModeProps> = ({ userId, username }) => {
                             )}
                             <div ref={chatEndRef} />
                         </div>
-                        <div className="p-4 bg-black/20 border-t border-white/10 flex gap-2">
+                        <div className="p-4 bg-black/20 border-t border-white/10 flex gap-2 shrink-0">
                             <input 
                                 value={chatInput} 
                                 onChange={e => setChatInput(e.target.value)} 
@@ -484,7 +484,7 @@ const ResearchMode: React.FC<ResearchModeProps> = ({ userId, username }) => {
                 {activeTab === 'PODCAST' && (
                     !currentProject?.podcast_script ? <div className="flex-1 flex flex-col items-center justify-center opacity-50"><Headphones size={64} className="mb-4"/><button onClick={handleGeneratePodcastScript} className="glass-button px-8 py-3 rounded-full font-bold">Generate Script</button></div>
                     : <div className="flex-1 flex flex-col h-full relative">
-                        <div className="flex justify-between items-center p-6 bg-white/5 border-b border-white/10 z-10">
+                        <div className="flex justify-between items-center p-6 bg-white/5 border-b border-white/10 z-10 shrink-0">
                             <div className="flex items-center gap-6">
                                 <button onClick={togglePlayback} className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-transform ${isPlaying ? 'bg-red-500' : 'bg-green-500'}`}>{isPlaying ? <Pause fill="white"/> : <Play fill="white"/>}</button>
                                 <div><h3 className="font-bold">Podcast</h3><div className="text-sm opacity-50">Browser TTS (Optimized)</div></div>

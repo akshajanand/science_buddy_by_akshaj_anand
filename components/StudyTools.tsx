@@ -479,7 +479,7 @@ export const QuizModule: React.FC = () => {
 
     const currentQ = questions[currentIndex];
     return (
-        <div className="h-full flex flex-col p-6 max-w-3xl mx-auto w-full">
+        <div className="h-full flex flex-col p-6 max-w-3xl mx-auto w-full overflow-y-auto custom-scrollbar">
             <div className="flex justify-between items-center mb-8">
                 <button onClick={() => setQuestions([])} className="p-2 hover:bg-white/10 rounded-full"><ArrowLeft /></button>
                 <div className="flex flex-col items-end">
@@ -692,7 +692,7 @@ export const WordPuzzle: React.FC = () => {
 
     return (
         <div className="h-full flex flex-col md:flex-row p-6 gap-8 overflow-hidden">
-            <div className="flex-1 flex flex-col items-center">
+            <div className="flex-1 flex flex-col items-center overflow-y-auto custom-scrollbar">
                 <div className="flex w-full justify-between items-center mb-4 md:hidden">
                     <h2 className="font-bold text-xl">{topic}</h2>
                     <button onClick={() => setWords([])}><ArrowLeft/></button>

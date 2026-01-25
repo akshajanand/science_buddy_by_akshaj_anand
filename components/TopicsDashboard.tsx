@@ -8,9 +8,41 @@ import { Skeleton } from './Skeleton';
 interface TopicsDashboardProps {
     userId: string;
     onSelectTopic: (topic: string) => void;
+    userClass?: string; // Prop to receive class level
 }
 
-const NCERT_CHAPTERS = [
+// Chapter Lists
+const CHAPTERS_CLASS_6 = [
+    "The Wonderful World of Science",
+    "Diversity in the Living World",
+    "Mindful Eating: A Path to a Healthy Body",
+    "Exploring Magnets",
+    "Measurement of Length and Motion",
+    "Materials Around Us",
+    "Temperature and its Measurement",
+    "A Journey through States of Water",
+    "Methods of Separation in Everyday Life",
+    "Living Creatures: Exploring their Characteristics",
+    "Nature's Treasures",
+    "Beyond Earth"
+];
+
+const CHAPTERS_CLASS_7 = [
+    "Matter in Our Surroundings",
+    "Is Matter Around Us Pure?",
+    "Atoms and Molecules",
+    "Structure of the Atom",
+    "The Fundamental Unit of Life",
+    "Tissues",
+    "Motion",
+    "Force and Laws of Motion",
+    "Gravitation",
+    "Work and Energy",
+    "Sound",
+    "Improvement in Food Resources"
+];
+
+const CHAPTERS_CLASS_8 = [
     "Crop Production and Management",
     "Microorganisms: Friend and Foe",
     "Coal and Petroleum",
@@ -26,9 +58,24 @@ const NCERT_CHAPTERS = [
     "Light"
 ];
 
-const TopicsDashboard: React.FC<TopicsDashboardProps> = ({ userId, onSelectTopic }) => {
+const TopicsDashboard: React.FC<TopicsDashboardProps> = ({ userId, onSelectTopic, userClass }) => {
     const [progressMap, setProgressMap] = useState<Record<string, TopicProgress>>({});
     const [loading, setLoading] = useState(true);
+    const [chapters, setChapters] = useState<string[]>(CHAPTERS_CLASS_8); // Default to 8
+
+    useEffect(() => {
+        // Determine chapters based on userClass
+        if (userClass === '6') {
+            setChapters(CHAPTERS_CLASS_6);
+        } else if (userClass === '7') {
+            setChapters(CHAPTERS_CLASS_7);
+        } else if (userClass === '8') {
+            setChapters(CHAPTERS_CLASS_8);
+        } else {
+            // Fallback for teacher or undefined
+            setChapters(CHAPTERS_CLASS_8); 
+        }
+    }, [userClass]);
 
     const fetchProgress = async () => {
         setLoading(true);
@@ -80,7 +127,7 @@ const TopicsDashboard: React.FC<TopicsDashboardProps> = ({ userId, onSelectTopic
         <div className="h-full flex flex-col p-6 overflow-hidden">
              <div className="mb-6">
                 <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-300 to-purple-300">
-                    NCERT Class 8 Science
+                    Class {userClass || '8'} Science
                 </h2>
                 <p className="text-white/60">Select a chapter to start your personalized quiz journey.</p>
             </div>
@@ -93,7 +140,7 @@ const TopicsDashboard: React.FC<TopicsDashboardProps> = ({ userId, onSelectTopic
                 </div>
             ) : (
                 <div className="flex-1 overflow-y-auto custom-scrollbar grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-10">
-                    {NCERT_CHAPTERS.map((chapter) => {
+                    {chapters.map((chapter) => {
                         const progress = progressMap[chapter];
                         const hasStarted = !!progress;
                         const isComplete = progress?.is_complete;

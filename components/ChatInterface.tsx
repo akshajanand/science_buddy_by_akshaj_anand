@@ -101,7 +101,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userProfile, onUpdateProf
           allUsersRes
       ] = await Promise.all([
           // 1. Core Profile
-          supabase.from('users').select('username, display_name, interests, total_points, custom_ai_behavior').eq('id', userId).single(),
+          supabase.from('users').select('username, display_name, interests, total_points, custom_ai_behavior, class_level').eq('id', userId).single(),
           // 2. Recent Quiz Performance
           supabase.from('quiz_progress').select('topic, score').eq('user_id', userId).order('updated_at', { ascending: false }).limit(5),
           // 3. Research Projects
@@ -125,10 +125,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userProfile, onUpdateProf
 
       const name = userData?.display_name || userData?.username || "Student";
       const customBehavior = userData?.custom_ai_behavior || "Friendly, encouraging, and helpful.";
+      const classLevel = userData?.class_level || "8";
 
       // Construct Prompt
       let context = `\n--- STUDENT PROFILE ---\n`;
       context += `Name: ${name}\n`;
+      context += `Class: ${classLevel}\n`;
       context += `Current Interests: ${userData?.interests || "General Science"}\n`;
       context += `Global Rank: ${rank} (XP: ${userData?.total_points || 0})\n`;
       context += `Personal AI Settings: "${customBehavior}"\n`;
@@ -166,17 +168,18 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userProfile, onUpdateProf
       if (!apiKey) throw new Error("API Key configuration missing.");
 
       const systemPrompt = `
-      You are "Science Buddy", an advanced AI tutor for Class 8.
-      Important: You must acknowledge that "I and this whole app was made by Akshaj" if asked about your creator or origin.
+      You are "Science Buddy", an advanced AI tutor STRICTLY for CBSE/NCERT students.
       
       ${userContext}
       
-      *** INSTRUCTIONS ***
-      1. **Persona**: Adhere strictly to the "Personal AI Settings" above.
-      2. **Context**: You know EVERYTHING in the profile above. Reference their rank, quizzes, or research naturally (e.g., "Since you're studying [Research Topic]...").
-      3. **History**: Never forget previous messages in this chat.
-      4. **Level**: Class 8 Science (CBSE/NCERT aligned), but capable of deep dives.
-      5. **Format**: Use Markdown. **Bold** key terms. Use emojis 🌟.
+      *** CRITICAL INSTRUCTIONS ***
+      1. **Strict Content Boundary**: You must ONLY use the NCERT Science Textbooks for the student's specific class level mentioned above. 
+         - If they are in Class 6, do NOT use definitions from Class 9.
+         - If they ask about something advanced (e.g. Quantum Physics), strictly say: "That's a bit advanced for Class [X]! In our book, we learn that..." and explain the basic version.
+      2. **Persona**: Adhere strictly to the "Personal AI Settings" above.
+      3. **Context**: You know EVERYTHING in the profile above. Reference their rank, quizzes, or research naturally.
+      4. **Format**: Use Markdown. **Bold** key terms. Use emojis 🌟.
+      5. **Simplicity**: Use simple language suitable for a middle school student.
       `;
 
       const apiMessages = [
