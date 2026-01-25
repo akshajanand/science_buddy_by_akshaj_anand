@@ -9,9 +9,11 @@ import { Skeleton } from './Skeleton';
 interface CommunityNotesProps {
     userId: string;
     username: string;
+    readOnly?: boolean;
+    filterByUserId?: string;
 }
 
-const CommunityNotes: React.FC<CommunityNotesProps> = ({ userId, username }) => {
+const CommunityNotes: React.FC<CommunityNotesProps> = ({ userId, username, readOnly = false, filterByUserId }) => {
     const [notes, setNotes] = useState<CommunityNote[]>([]);
     const [loading, setLoading] = useState(true);
     const [showUpload, setShowUpload] = useState(false);
@@ -25,22 +27,21 @@ const CommunityNotes: React.FC<CommunityNotesProps> = ({ userId, username }) => 
 
     useEffect(() => {
         fetchNotes();
-    }, []);
+    }, [filterByUserId]);
 
     const fetchNotes = async () => {
         setLoading(true);
-        // We now fetch avatar/display_name from the joined users table if we had relations, 
-        // but for simplicity/speed in this flat structure, we rely on what was saved 
-        // OR we can do a quick join. Since Supabase types here are loose, we can try to join.
-        // However, to keep it simple with existing row structure, we'll fetch just notes. 
-        // NOTE: Ideally, CommunityNote rows should link to user profile. 
-        // Let's assume we save snapshot or fetch user details.
         
-        // BETTER APPROACH: Fetch notes, then fetch user profiles for them.
-        const { data: notesData } = await supabase
+        let query = supabase
             .from('community_notes')
             .select('*')
             .order('created_at', { ascending: false });
+
+        if (filterByUserId) {
+            query = query.eq('user_id', filterByUserId);
+        }
+            
+        const { data: notesData } = await query;
             
         if (notesData) {
             // Get unique user IDs
@@ -149,15 +150,19 @@ const CommunityNotes: React.FC<CommunityNotesProps> = ({ userId, username }) => 
         <div className="h-full flex flex-col p-6 relative">
             <div className="flex justify-between items-end mb-6">
                 <div>
-                    <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-orange-300 to-pink-300">Community Notes</h2>
-                    <p className="opacity-60">Share your revision notes, summaries, or files.</p>
+                    <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-orange-300 to-pink-300">
+                        {filterByUserId ? "Student Portfolio" : "Community Notes"}
+                    </h2>
+                    <p className="opacity-60">{filterByUserId ? "Viewing student's shared notes." : "Share your revision notes, summaries, or files."}</p>
                 </div>
-                <button 
-                    onClick={() => setShowUpload(true)} 
-                    className="glass-button px-6 py-3 rounded-xl flex items-center gap-2 font-bold bg-white/10 hover:bg-white/20 shadow-lg"
-                >
-                    <Plus size={18} /> New Post
-                </button>
+                {!readOnly && (
+                    <button 
+                        onClick={() => setShowUpload(true)} 
+                        className="glass-button px-6 py-3 rounded-xl flex items-center gap-2 font-bold bg-white/10 hover:bg-white/20 shadow-lg"
+                    >
+                        <Plus size={18} /> New Post
+                    </button>
+                )}
             </div>
 
             {/* Upload Modal - Enhanced */}
@@ -269,6 +274,7 @@ const CommunityNotes: React.FC<CommunityNotesProps> = ({ userId, username }) => 
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto custom-scrollbar pb-10">
+                    {notes.length === 0 && <div className="col-span-full text-center opacity-50 py-10">No notes found.</div>}
                     {notes.map(note => (
                         <div 
                             key={note.id} 

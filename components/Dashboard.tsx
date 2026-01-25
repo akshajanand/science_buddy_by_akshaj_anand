@@ -5,7 +5,7 @@ import { ChatSession, AppView } from '../types';
 import { 
     Mic, MessageSquare, Book, Zap, ArrowRight, Play, Trophy, Sparkles, 
     Search, Headphones, Puzzle, Network, PenTool, BookOpen, FileText, 
-    Clock, Activity, Star, Clapperboard
+    Clock, Activity, Star, Clapperboard, Users, MessageCircle, Layout, Layers
 } from 'lucide-react';
 import { Skeleton } from './Skeleton';
 
@@ -100,6 +100,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onResumeSession
 
     const getGradientForTool = (id: string) => {
         switch(id) {
+            case AppView.CHAT: return "from-cyan-500 to-blue-600";
             case AppView.RESEARCH: return "from-blue-500 to-cyan-500";
             case AppView.VIDEO_GEN: return "from-pink-500 to-rose-500";
             case AppView.QUIZ: return "from-indigo-500 to-violet-500";
@@ -110,6 +111,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onResumeSession
             case AppView.MATCHING: return "from-lime-500 to-green-500";
             case AppView.CONCEPT_MAP: return "from-sky-500 to-blue-500";
             case AppView.STYLE_SWAPPER: return "from-yellow-400 to-orange-500";
+            case AppView.COMMUNITY: return "from-teal-500 to-emerald-500";
+            case AppView.DISCUSSION: return "from-violet-500 to-purple-500";
+            case AppView.FEED: return "from-pink-500 to-orange-500";
+            case AppView.TOPICS: return "from-cyan-500 to-blue-500";
+            case AppView.LEADERBOARD: return "from-yellow-400 to-amber-500";
             default: return "from-gray-600 to-gray-500";
         }
     };
@@ -117,6 +123,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onResumeSession
     const hasJumpBackContent = resumeTopics.length > 0 || resumeTextChats.length > 0 || resumeVoiceChats.length > 0;
 
     const allActions = [
+        { id: AppView.CHAT, title: 'AI Tutor', icon: MessageSquare, desc: 'Chat with Science Buddy' },
+        { id: AppView.TOPICS, title: 'Topic Explorer', icon: Layers, desc: 'NCERT Chapter Quizzes' },
         { id: AppView.RESEARCH, title: 'Research Lab', icon: FileText, desc: 'Upload PDFs & Generate Quizzes' },
         { id: AppView.VIDEO_GEN, title: 'AI Video Lab', icon: Clapperboard, desc: 'Generate Narrated Lessons' },
         { id: AppView.QUIZ, title: 'Flash Quiz', icon: Zap, desc: 'Instant AI Questions' },
@@ -127,6 +135,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onResumeSession
         { id: AppView.MATCHING, title: 'Mind Match', icon: Puzzle, desc: 'Memory Card Game' },
         { id: AppView.CONCEPT_MAP, title: 'Concept Map', icon: Network, desc: 'Visual Knowledge Graph' },
         { id: AppView.STYLE_SWAPPER, title: 'Style Swap', icon: PenTool, desc: 'Rewrite Boring Text' },
+        { id: AppView.COMMUNITY, title: 'Notes', icon: Users, desc: 'Shared Community Notes' },
+        { id: AppView.DISCUSSION, title: 'Discussion', icon: MessageCircle, desc: 'Ask & Answer Doubts' },
+        { id: AppView.FEED, title: 'Social Feed', icon: Layout, desc: 'Share your Science' },
+        { id: AppView.LEADERBOARD, title: 'Leaderboard', icon: Trophy, desc: 'Check Global Rankings' },
     ];
 
     if (loading) {
@@ -153,7 +165,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onResumeSession
         <div className="h-full overflow-y-auto custom-scrollbar p-4 md:p-8 space-y-8">
             
             {/* 1. Hero Section */}
-            <div className="relative overflow-hidden rounded-3xl p-8 border border-white/10 shadow-2xl group">
+            <div className="relative overflow-hidden rounded-3xl p-6 md:p-8 border border-white/10 shadow-2xl group">
                 {/* Dynamic Background */}
                 <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/60 via-purple-900/40 to-black/60 z-0"></div>
                 <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/20 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/2"></div>
@@ -163,10 +175,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onResumeSession
                         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 backdrop-blur-md text-xs font-bold uppercase tracking-widest text-cyan-300 mb-4 shadow-lg">
                             <Sparkles size={12} /> Science Buddy
                         </div>
-                        <h1 className="text-4xl md:text-5xl font-bold text-white mb-2 tracking-tight">
+                        <h1 className="text-3xl md:text-5xl font-bold text-white mb-2 tracking-tight leading-tight">
                             {getGreeting()}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400">{user.username}</span>
                         </h1>
-                        <p className="text-lg text-white/60 max-w-xl">
+                        <p className="text-base md:text-lg text-white/60 max-w-xl">
                             Ready to unlock some new knowledge today? Your personal AI lab is prepped and ready.
                         </p>
                     </div>

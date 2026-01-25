@@ -15,10 +15,11 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ currentUserId, currentUserPoi
 
     useEffect(() => {
         const fetchLeaderboard = async () => {
-            // Fetch users ordered by total_points (All time)
+            // Fetch users ordered by total_points (All time), excluding teachers
             const { data, error } = await supabase
                 .from('users')
-                .select('id, username, display_name, avatar_url, total_points')
+                .select('id, username, display_name, avatar_url, total_points, role')
+                .neq('role', 'teacher') // Exclude teachers
                 .order('total_points', { ascending: false })
                 .limit(20);
 

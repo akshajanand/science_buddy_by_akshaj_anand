@@ -1,4 +1,5 @@
 
+
 export enum AppView {
   DASHBOARD = 'DASHBOARD',
   CHAT = 'CHAT',
@@ -15,7 +16,9 @@ export enum AppView {
   STYLE_SWAPPER = 'STYLE_SWAPPER',
   RESEARCH = 'RESEARCH',
   COMMUNITY = 'COMMUNITY', 
-  VIDEO_GEN = 'VIDEO_GEN' // New Video Generator
+  VIDEO_GEN = 'VIDEO_GEN',
+  DISCUSSION = 'DISCUSSION', // New Discussion Board
+  FEED = 'FEED' // New Social Feed
 }
 
 export interface ChatSession {
@@ -68,7 +71,7 @@ export type PuzzleWord = {
   word: string;
   clue: string;
   found: boolean;
-};
+}
 
 export interface PuzzleGrid {
   grid: string[][];
@@ -140,4 +143,93 @@ export interface VideoProject {
   title: string;
   slides: VideoSlide[];
   created_at: string;
+}
+
+export interface DiscussionThread {
+  id: string;
+  user_id: string;
+  title: string;
+  content: string;
+  category: string;
+  likes: number;
+  created_at: string;
+  users?: { // Joined from users table
+      username: string;
+      display_name?: string;
+      avatar_url?: string;
+  };
+  comment_count?: number; // Calculated field
+}
+
+export interface DiscussionComment {
+  id: string;
+  thread_id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+  users?: {
+      username: string;
+      display_name?: string;
+      avatar_url?: string;
+  };
+}
+
+export interface FeedPost {
+  id: string;
+  user_id: string;
+  content: string;
+  media_url?: string;
+  media_type?: 'IMAGE' | 'VIDEO' | null;
+  created_at: string;
+  likes: number;
+  users?: {
+      username: string;
+      display_name?: string;
+      avatar_url?: string;
+  };
+}
+
+export interface FeedComment {
+  id: string;
+  post_id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+  users?: {
+      username: string;
+      display_name?: string;
+      avatar_url?: string;
+  };
+}
+
+export interface AppNotification {
+  id: string;
+  user_id: string;
+  actor_id: string;
+  type: 'LIKE' | 'COMMENT' | 'SAVE' | 'REPLY';
+  reference_id: string;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+  actor?: {
+      username: string;
+      avatar_url?: string;
+  }
+}
+
+export interface UserData {
+    id: string;
+    username: string;
+    interests: string;
+    total_points?: number;
+    last_reset_date?: string;
+    avatar_url?: string;
+    display_name?: string;
+    ui_theme?: string;
+    sidebar_dock?: 'LEFT' | 'RIGHT' | 'TOP' | 'BOTTOM';
+    custom_ai_behavior?: string;
+    role?: 'student' | 'teacher'; // Added Role
+    email?: string;
+    class_level?: string;
+    section?: string;
 }

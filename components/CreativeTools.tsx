@@ -224,7 +224,8 @@ export const ConceptMap: React.FC<ConceptMapProps> = ({ userId, overrideData }) 
 
     // Calculate Layout whenever Data Changes
     useEffect(() => {
-        if (!data) {
+        // Safe check to prevent crashes if data is malformed
+        if (!data || !data.root) {
             setLayout([]);
             return;
         }
@@ -234,9 +235,12 @@ export const ConceptMap: React.FC<ConceptMapProps> = ({ userId, overrideData }) 
         newLayout.push({ data: data.root, x: 0, y: 0, isRoot: true });
 
         // Children in circle
-        const count = data.children.length;
+        // Safe check for children array
+        const children = Array.isArray(data.children) ? data.children : [];
+        const count = children.length;
         const radius = 250;
-        data.children.forEach((child, i) => {
+        
+        children.forEach((child, i) => {
             const angle = (i / count) * 2 * Math.PI - (Math.PI / 2); // Start from top
             newLayout.push({
                 data: child,
@@ -479,7 +483,7 @@ export const ConceptMap: React.FC<ConceptMapProps> = ({ userId, overrideData }) 
                                                     <span className="font-bold text-lg">{node.data.label}</span>
                                                  </div>
                                             ) : (
-                                                <div className={`px-5 py-2 rounded-full border backdrop-blur-md shadow-lg flex items-center gap-2 whitespace-nowrap ${selectedNode === node.data ? 'bg-[#2a2a35] border-cyan-500 text-white z-20 scale-110' : 'bg-[#1a1a20] border-white/10 text-white/80'}`}>
+                                                <div className={`px-5 py-2 rounded-full border backdrop-blur-md shadow-lg flex items-center gap-2 whitespace-nowrap ${selectedNode === node.data ? 'bg-[#2a3942] border-cyan-500 text-white z-20 scale-110' : 'bg-[#1a1a20] border-white/10 text-white/80'}`}>
                                                     <span className="text-sm font-medium max-w-[150px] truncate">{node.data.label}</span>
                                                 </div>
                                             )}

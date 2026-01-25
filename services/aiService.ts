@@ -8,7 +8,7 @@ import { showToast } from "../utils/notificationUtils";
 // Priority list of models to use. If one fails, the app automatically switches to the next.
 const BACKUP_MODELS = [
     "llama-3.3-70b-versatile", // Primary: Highest Intelligence
-    "llama-3.1-8b-instant",    // Secondary: Ultra Fast, good for basic chat
+    "llama-3.1-8b-instant",    // Secondary: Ultra Fast
     "mixtral-8x7b-32768",      // Tertiary: Reliable Fallback
     "gemma2-9b-it"             // Final Resort
 ];
@@ -39,7 +39,7 @@ const getPexelsApiKey = async () => {
 /**
  * Core function to communicate with Groq API.
  */
-const callGroqAPI = async (
+export const callGroqAPI = async (
     messages: { role: string; content: string }[],
     jsonMode: boolean = false,
     temperature: number = 0.7
@@ -82,7 +82,6 @@ const callGroqAPI = async (
                     continue; 
                 }
                 if (status >= 500) continue;
-                console.warn(`Groq API Error (${status}) on ${model}.`);
                 continue;
             }
 
@@ -101,25 +100,23 @@ const callGroqAPI = async (
 const cleanAndParseJSON = (text: string | null): any => {
     if (!text) return null;
     try {
+        // Remove markdown code blocks if present
         const cleanText = text.replace(/```json\n?|```/g, "").trim();
         return JSON.parse(cleanText);
     } catch (e) {
+        console.error("JSON Parse Error", e);
         return null;
     }
 };
 
 // --- XP SYSTEM ---
 
-/**
- * Awards XP to the user and notifies the UI.
- */
 export const checkAndAwardDailyXP = async (userId: string, amount: number, activityName: string) => {
     try {
-        // Daily limit check removed by request.
         await supabase.rpc('increment_score', { row_id: userId, points: amount });
         showToast(`+${amount} XP! ${activityName} 🌟`, 'success');
-        // Notify Client App to update state immediately
-        window.dispatchEvent(new CustomEvent('science-buddy-points-update', { detail: amount }));
+        const event = new CustomEvent('science-buddy-points-update', { detail: amount });
+        window.dispatchEvent(event);
     } catch (e) {
         console.error("XP Error", e);
     }
@@ -129,27 +126,18 @@ export const checkAndAwardDailyXP = async (userId: string, amount: number, activ
 
 const CLASS_8_SYSTEM_PROMPT = `
 You are "Science Buddy", a highly personalized AI tutor for Class 8 Science students.
-
-CORE RULES:
-1. **Context Aware**: I will provide you with the student's profile, recent scores, and interests. USE THIS DATA.
-   - If they like "Football", use football analogies for physics.
-   - If they failed a "Friction" quiz recently, gently suggest reviewing it.
-   - If they have a high rank, congratulate them.
-2. **Socratic**: Don't just give answers. Guide them.
-3. **Memory**: Treat the conversation history as truth.
-
-TONE:
-- Enthusiastic, Relatable, Encouraging.
-- Use emojis occasionally.
+RULES:
+1. **Context Aware**: Use provided student profile/stats.
+2. **Socratic**: Guide them, don't just lecture.
+3. **Tone**: Enthusiastic, Relatable, Encouraging. Use emojis.
 `;
 
 const VOICE_SYSTEM_PROMPT = `
 You are "Science Buddy", speaking directly to a Class 8 student via a voice call.
-CRITICAL VOICE RULES:
+RULES:
 1. **NO VISUALS**: Output is for Text-to-Speech only.
 2. **Conversational**: Speak like a human friend.
 3. **Concise**: Short answers (1-2 sentences max unless explained).
-4. **Personal**: Use the user's name and interests.
 `;
 
 export interface LiveUserContext {
@@ -207,24 +195,16 @@ export const analyzeUserProfile = async (data: any) => {
 
 export const chatWithAI = async (message: string, history: any[], userContext: LiveUserContext) => {
   let systemInstruction = CLASS_8_SYSTEM_PROMPT;
-  
-  // Inject Personalization
   const name = userContext.name || "Student";
   const interests = userContext.interests || "General Science";
   
   let statsContext = "";
   if (userContext.stats) {
-      statsContext = `
-      CURRENT STUDENT DATA:
-      - Rank: #${userContext.stats.rank} (XP: ${userContext.stats.totalPoints})
-      - Recent Quizzes: ${JSON.stringify(userContext.stats.recentQuizScores)}
-      - Researching: ${JSON.stringify(userContext.stats.researchTopics)}
-      `;
+      statsContext = `\nSTUDENT DATA:\n- Rank: #${userContext.stats.rank}\n- Recent Quizzes: ${JSON.stringify(userContext.stats.recentQuizScores)}`;
   }
 
   if (userContext.customBehavior) systemInstruction += `\n\nUSER CUSTOM INSTRUCTION: "${userContext.customBehavior}"`;
-  
-  systemInstruction += `\n\nPROFILE: Name: ${name}, Interests: ${interests}.\n${statsContext}`;
+  systemInstruction += `\n\nPROFILE: Name: ${name}, Interests: ${interests}.${statsContext}`;
 
   const messages = [{ role: "system", content: systemInstruction }, ...history.map(h => ({ role: h.role === 'model' ? "assistant" : "user", content: h.text })), { role: "user", content: message }];
   const response = await callGroqAPI(messages, false);
@@ -241,179 +221,141 @@ export const chatWithAIVoice = async (message: string, history: any[], userConte
   return response || "I'm not sure I heard that correctly.";
 };
 
-export const generateTitle = async (message: string): Promise<string> => {
-    const prompt = `Summarize into 3-5 word title. Msg: "${message}"`;
+export const generateTitle = async (message: string) => {
+    const prompt = `Summarize this message into a 3-5 word title: "${message}"`;
     const response = await callGroqAPI([{ role: "user", content: prompt }]);
-    return response?.trim().replace(/^"|"$/g, '') || message.slice(0, 30);
+    return response?.replace(/"/g, '').trim();
 };
 
-// --- IMPLEMENTED GENERATORS ---
-
-export const generatePerformanceReport = async (username: string, interests: string, stats: any) => {
+export const generateStoryNode = async (history: string, choice?: string | null, topic?: string) => {
     const prompt = `
-    Act as a friendly, expert Academic Advisor for Class 8 student "${username}".
+    Interactive Science Story.
+    Topic: ${topic || 'Continuing the story'}.
+    History: ${history}
+    User Choice: ${choice || 'Start'}
     
-    STUDENT DATA:
-    - Rank: #${stats.rank}
-    - Total XP: ${stats.totalPoints}
-    - Quizzes Taken: ${stats.quizzesAttempted}
-    - Topic Scores: ${JSON.stringify(stats.topicScores)}
-    - Research Docs: ${stats.researchProjects.length}
-    - Community Notes Shared: ${stats.communityNotes}
-    - Interests: ${interests}
-
-    TASK:
-    Write a detailed, personalized performance review in Markdown.
-    
-    STRUCTURE:
-    1. **Overview**: A high-energy greeting acknowledging their Rank and XP.
-    2. **Strengths**: Analyze high quiz scores. Be specific.
-    3. **Areas for Growth**: Analyze low scores or topics not yet attempted.
-    4. **Action Plan**: Suggest specific "Study Pod" topics or "Research Lab" ideas based on their interests (${interests}) to improve weak areas.
-    5. **Fun Fact**: A weird scientific fact related to their best topic.
-
-    Make it look dynamic and professional using bolding, lists, and emojis.
-    `;
-
-    const response = await callGroqAPI([{ role: "user", content: prompt }]);
-    return response || "Analysis unavailable at the moment.";
-};
-
-export const generateQuizQuestions = async (topic: string, count: number = 5, interests: string = "General", seed?: string): Promise<QuizQuestion[]> => {
-    const prompt = `Generate ${count} multiple-choice questions for Class 8 Science level.
-    Topic: "${topic}"
-    Context: ${interests}
-    
-    Output strictly valid JSON:
+    Output JSON:
     {
-      "questions": [
-        {
-          "question": "Why is the sky blue?",
-          "options": ["Rayleigh scattering", "Reflection", "Refraction", "Dispersion"],
-          "correctAnswer": "Rayleigh scattering",
-          "explanation": "Blue light is scattered in all directions by the tiny molecules of air in Earth's atmosphere."
-        }
-      ]
-    }`;
-
-    const response = await callGroqAPI([{ role: "user", content: prompt }], true);
-    const data = cleanAndParseJSON(response);
-    return data?.questions || [];
+        "text": "Story segment (max 100 words)...",
+        "choices": [ {"text": "Option 1"}, {"text": "Option 2"} ],
+        "isEnding": false
+    }
+    `;
+    const res = await callGroqAPI([{ role: "user", content: prompt }], true);
+    return cleanAndParseJSON(res);
 };
 
-export const generateWordPuzzle = async (topic: string): Promise<PuzzleWord[]> => {
-    const prompt = `Generate 8 scientific words related to "${topic}" for a word search puzzle.
-    Return JSON: { "words": [ { "word": "ATOM", "clue": "Basic unit of matter" } ] }`;
-    const response = await callGroqAPI([{ role: "user", content: prompt }], true);
-    return cleanAndParseJSON(response)?.words || [];
+export const rewriteText = async (text: string, style: string) => {
+    const prompt = `Rewrite the following text in the style of ${style}:\n\n"${text}"`;
+    return await callGroqAPI([{ role: "user", content: prompt }]) || "Failed to rewrite.";
+};
+
+export const generateConceptMapData = async (topic: string) => {
+    const prompt = `Generate a concept map for "${topic}" in JSON format.
+    { "root": {"label": "${topic}", "description": "short desc"}, "children": [{"label": "Subconcept", "description": "desc"}] }`;
+    const res = await callGroqAPI([{ role: "user", content: prompt }], true);
+    return cleanAndParseJSON(res);
 };
 
 export const generateMatchingPairs = async (topic: string): Promise<MatchingPair[]> => {
-    const prompt = `Generate 5 matching pairs for topic "${topic}".
-    Return JSON: { "pairs": [ { "id": "1", "term": "Mitochondria", "definition": "Powerhouse" } ] }`;
-    const response = await callGroqAPI([{ role: "user", content: prompt }], true);
-    return cleanAndParseJSON(response)?.pairs || [];
+    const prompt = `Generate 6 matching pairs (term and definition) for topic: ${topic}. JSON Format: { "pairs": [{ "id": "1", "term": "...", "definition": "..." }] }`;
+    const res = await callGroqAPI([{ role: "user", content: prompt }], true);
+    return cleanAndParseJSON(res)?.pairs || [];
 };
 
-export const generateStudyPodSummary = async (topic: string) => { 
-    const prompt = `Create a fun, engaging summary of "${topic}" for a Class 8 student. Avoid markdown symbols. Keep it conversational.`; 
-    const r = await callGroqAPI([{ role: "user", content: prompt }]); 
-    return r || "Could not generate summary."; 
+export const generateStudyPodSummary = async (topic: string) => {
+    const prompt = `Write a concise, engaging audio summary script about ${topic} for a student. Max 150 words.`;
+    return await callGroqAPI([{ role: "user", content: prompt }]) || "";
 };
 
 export const generatePodcastScript = async (topic: string): Promise<PodcastSegment[]> => {
-    const prompt = `Write a short 2-person educational podcast script about "${topic}".
-    Host 1 (Rohan): Curious student.
-    Host 2 (Ms. Rachel): Fun teacher.
-    Return JSON: { "script": [ {"speaker": "Host 1", "text": "..."} ] }`;
-    const response = await callGroqAPI([{ role: "user", content: prompt }], true);
-    return cleanAndParseJSON(response)?.script || [];
-}; 
-
-// ... [Keep other stubbed functions if not critical, or implement similarly] ...
-export const generateStoryNode = async (context: string, choice: string|null, topic?: string) => { 
-    const prompt = topic ? `Start a sci-fi adventure about ${topic}. JSON: { "text": "...", "choices": [{"text": "...", "nextId": "..."}] }` : `Continue story. Context: ${context}. Choice: ${choice}. JSON same format.`;
-    const response = await callGroqAPI([{ role: "user", content: prompt }], true);
-    return cleanAndParseJSON(response);
+    const prompt = `Create a 2-person podcast script about ${topic}. Host 1 is Ms. Rachel (Teacher), Host 2 is Rohan (Student). 
+    JSON Format: { "script": [ {"speaker": "Host 1", "text": "..."}, {"speaker": "Host 2", "text": "..."} ] }`;
+    const res = await callGroqAPI([{ role: "user", content: prompt }], true);
+    return cleanAndParseJSON(res)?.script || [];
 };
 
-export const rewriteText = async (text: string, style: string) => { 
-    const prompt = `Rewrite this in ${style} style: "${text}"`;
-    return await callGroqAPI([{ role: "user", content: prompt }]) || text;
+export const generateQuizQuestions = async (topic: string, count: number, interests: string, seed?: string): Promise<QuizQuestion[]> => {
+    const prompt = `Generate ${count} multiple choice questions for Class 8 Science on topic: "${topic}".
+    Context: Student likes ${interests}.
+    Output JSON: { "questions": [ { "question": "...", "options": ["A","B","C","D"], "correctAnswer": "A", "explanation": "..." } ] }`;
+    const res = await callGroqAPI([{ role: "user", content: prompt }], true);
+    return cleanAndParseJSON(res)?.questions || [];
 };
 
-export const generateConceptMapData = async (topic: string) => { 
-    const prompt = `Create concept map for "${topic}". JSON: { "root": { "label": "${topic}", "description": "..." }, "children": [ { "label": "Subconcept", "description": "..." } ] }`;
-    const response = await callGroqAPI([{ role: "user", content: prompt }], true);
-    return cleanAndParseJSON(response);
+export const generateWordPuzzle = async (topic: string): Promise<PuzzleWord[]> => {
+    const prompt = `Generate 8 scientific terms related to ${topic} for a word search. JSON: { "words": [ {"word": "ATOM", "clue": "Basic unit of matter"} ] }`;
+    const res = await callGroqAPI([{ role: "user", content: prompt }], true);
+    return cleanAndParseJSON(res)?.words || [];
 };
 
-export const generateResearchTitle = async (t: string) => { return "Research Note"; };
-export const generateSummaryFromText = async (t: string) => { return await callGroqAPI([{role: "user", content: `Summarize: ${t.slice(0, 2000)}`}]) || ""; };
-export const generateQuizFromText = async (t: string) => { return []; };
-export const generateInfographicFromText = async (t: string) => { return {root:null,children:[]}; };
-export const generatePodcastScriptFromText = async (t: string) => { return []; };
-export const chatWithResearchDocument = async (q: string, h: any[], d: string) => { 
-    return await callGroqAPI([{role: "system", content: `Context: ${d.slice(0, 3000)}`}, ...h, {role: "user", content: q}]) || ""; 
+export const generateResearchTitle = async (text: string) => {
+    const prompt = `Generate a short title for this research note (max 5 words): ${text.substring(0, 500)}`;
+    return await callGroqAPI([{ role: "user", content: prompt }]) || "New Research";
 };
 
-// --- VIDEO GENERATOR FUNCTIONS ---
-
-export const generateVideoPlan = async (topic: string): Promise<VideoSlide[]> => {
-    const prompt = `Create a comprehensive, in-depth educational video script about "${topic}" for Class 8 Science.
-    Structure it as 10-15 distinct slides to ensure the video is at least 3 minutes long.
-    For each slide, provide:
-    1. "text": A long, detailed paragraph for the narrator to speak (approx 100-150 words per slide). Explain concepts thoroughly with examples, analogies, and scientific depth. Do not be brief.
-    2. "keyword": A highly visual search term to find a stock photo for this specific context.
-
-    Return ONLY a JSON object:
-    {
-        "slides": [
-            { "text": "...", "keyword": "..." },
-            ...
-        ]
-    }`;
-
-    const response = await callGroqAPI([{ role: "user", content: prompt }], true);
-    const data = cleanAndParseJSON(response);
-    return data?.slides || [];
+export const generateSummaryFromText = async (text: string) => {
+    const prompt = `Summarize this text in bullet points: ${text.substring(0, 5000)}`;
+    return await callGroqAPI([{ role: "user", content: prompt }]) || "Summary unavailable.";
 };
 
-export const fetchStockImage = async (keyword: string): Promise<{ url: string, photographer: string } | null> => {
-    const apiKey = await getPexelsApiKey();
-    if (!apiKey) return null;
+export const generateQuizFromText = async (text: string) => {
+    const prompt = `Generate 5 quiz questions based on this text. JSON format same as before. Text: ${text.substring(0, 5000)}`;
+    const res = await callGroqAPI([{ role: "user", content: prompt }], true);
+    return cleanAndParseJSON(res)?.questions || [];
+};
 
-    try {
-        const res = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(keyword)}&per_page=1&orientation=landscape`, {
-            headers: {
-                Authorization: apiKey
-            }
-        });
-        
-        if (!res.ok) return null;
-        
-        const data = await res.json();
-        if (data.photos && data.photos.length > 0) {
-            return {
-                url: data.photos[0].src.large2x || data.photos[0].src.large,
-                photographer: data.photos[0].photographer
-            };
-        }
-    } catch (e) {
-        console.error("Pexels fetch error", e);
-    }
-    return null;
+export const generatePodcastScriptFromText = async (text: string) => {
+    const prompt = `Convert this text into a dialogue script between a Teacher and Student. JSON format: { "script": [...] }. Text: ${text.substring(0, 5000)}`;
+    const res = await callGroqAPI([{ role: "user", content: prompt }], true);
+    return cleanAndParseJSON(res)?.script || [];
+};
+
+export const checkContentSafety = async (text: string) => {
+    // Simple mock or real check. For now, basic keyword filter + AI check if needed.
+    // To save tokens, we'll do a simple local check first.
+    const badWords = ['hate', 'violence', 'kill', 'stupid', 'idiot']; // Very basic list
+    if (badWords.some(w => text.toLowerCase().includes(w))) return { safe: false, reason: "Inappropriate language detected." };
+    return { safe: true };
+};
+
+export const generatePerformanceReport = async (username: string, interests: string, stats: any) => {
+    const prompt = `
+    Generate a motivational performance report for student ${username} (Interests: ${interests}).
+    Stats: ${JSON.stringify(stats)}.
+    Keep it under 200 words. Use formatting.
+    `;
+    return await callGroqAPI([{ role: "user", content: prompt }]) || "Analysis unavailable.";
 };
 
 export const createVideoProject = async (topic: string): Promise<VideoSlide[]> => {
-    const slides = await generateVideoPlan(topic);
-    const hydratedSlides = await Promise.all(slides.map(async (slide) => {
-        const image = await fetchStockImage(slide.keyword + " science");
-        return {
-            ...slide,
-            imageUrl: image?.url || 'https://images.pexels.com/photos/256381/pexels-photo-256381.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
-            photographer: image?.photographer || 'Unknown'
-        };
-    }));
-    return hydratedSlides;
+    const prompt = `
+    Create a 5-slide video script for "${topic}".
+    For each slide, provide:
+    1. 'text': The narration script (max 30 words).
+    2. 'keyword': A single visual keyword to search for an image (e.g. "volcano", "microscope").
+    
+    JSON Format: { "slides": [ {"text": "...", "keyword": "..."} ] }
+    `;
+    const res = await callGroqAPI([{ role: "user", content: prompt }], true);
+    const data = cleanAndParseJSON(res)?.slides || [];
+
+    // Fetch images from Pexels for each slide
+    const pexelsKey = await getPexelsApiKey();
+    if (pexelsKey) {
+        for (let slide of data) {
+            try {
+                const pexelsRes = await fetch(`https://api.pexels.com/v1/search?query=${slide.keyword}&per_page=1`, {
+                    headers: { Authorization: pexelsKey }
+                });
+                const pexelsData = await pexelsRes.json();
+                if (pexelsData.photos && pexelsData.photos.length > 0) {
+                    slide.imageUrl = pexelsData.photos[0].src.large;
+                    slide.photographer = pexelsData.photos[0].photographer;
+                }
+            } catch (e) { console.error("Pexels error", e); }
+        }
+    }
+    
+    return data;
 };

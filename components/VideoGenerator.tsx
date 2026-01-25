@@ -21,22 +21,17 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ userId }) => {
     const [showLibrary, setShowLibrary] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
 
-    // Refs for playback loop
     const slideIndexRef = useRef(0);
     const isPlayingRef = useRef(false);
     const playerContainerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         fetchProjects();
-        return () => {
-            stopPlayback();
-        };
+        return () => { stopPlayback(); };
     }, [userId]);
 
     useEffect(() => {
-        const handleFullscreenChange = () => {
-            setIsFullscreen(!!document.fullscreenElement);
-        };
+        const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
         document.addEventListener('fullscreenchange', handleFullscreenChange);
         return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
     }, []);
@@ -55,11 +50,9 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ userId }) => {
             setCurrentSlides(slides);
             setCurrentSlideIndex(0);
             slideIndexRef.current = 0;
-            // Auto-play after generation
             handlePlay();
         } catch (e) {
             showToast("Failed to generate video.", 'error');
-            console.error(e);
         }
         setLoading(false);
     };
@@ -68,8 +61,6 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ userId }) => {
         if (currentSlides.length === 0) return;
         setIsPlaying(true);
         isPlayingRef.current = true;
-        
-        // Start speaking the current slide
         speakSlide(slideIndexRef.current);
     };
 
@@ -78,21 +69,14 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ userId }) => {
             stopPlayback();
             return;
         }
-
         setCurrentSlideIndex(index);
         slideIndexRef.current = index;
-
         const slide = currentSlides[index];
         speechManager.speak(slide.text, {
             voice: speechManager.getFemaleVoice(),
             rate: 0.95,
             onEnd: () => {
-                if (isPlayingRef.current) {
-                    // Short pause before next slide
-                    setTimeout(() => {
-                        speakSlide(index + 1);
-                    }, 500);
-                }
+                if (isPlayingRef.current) setTimeout(() => speakSlide(index + 1), 500);
             }
         });
     };
@@ -104,20 +88,13 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ userId }) => {
     };
 
     const togglePlay = () => {
-        if (isPlaying) {
-            stopPlayback();
-        } else {
-            handlePlay();
-        }
+        if (isPlaying) stopPlayback(); else handlePlay();
     };
 
     const toggleFullscreen = () => {
         if (!playerContainerRef.current) return;
-        
         if (!document.fullscreenElement) {
-            playerContainerRef.current.requestFullscreen().catch(err => {
-                console.error(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
-            });
+            playerContainerRef.current.requestFullscreen().catch(err => console.error(err));
         } else {
             document.exitFullscreen();
         }
@@ -127,7 +104,6 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ userId }) => {
         const newIndex = Number(e.target.value);
         setCurrentSlideIndex(newIndex);
         slideIndexRef.current = newIndex;
-        // If playing, restart speech from new slide
         if (isPlaying) {
             stopPlayback();
             setIsPlaying(true);
@@ -139,14 +115,11 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ userId }) => {
     const handleSave = async () => {
         if (currentSlides.length === 0 || !userId) return;
         const { data, error } = await supabase.from('video_projects').insert({
-            user_id: userId,
-            title: topic,
-            slides: currentSlides
+            user_id: userId, title: topic, slides: currentSlides
         }).select().single();
-
         if (data && !error) {
             setSavedProjects([data, ...savedProjects]);
-            showToast("Video saved to library!", 'success');
+            showToast("Video saved!", 'success');
         } else {
             showToast("Failed to save.", 'error');
         }
@@ -169,20 +142,18 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ userId }) => {
 
     return (
         <div className="h-full flex flex-col p-4 md:p-6 relative">
-            {/* Header */}
             <div className="flex justify-between items-center mb-6">
                 <div>
-                    <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-pink-400 to-rose-400 flex items-center gap-2">
+                    <h2 className="text-2xl md:text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-pink-400 to-rose-400 flex items-center gap-2">
                         <Clapperboard className="text-rose-400" /> AI Video Lab
                     </h2>
-                    <p className="text-white/60">Generate full narrated lessons.</p>
+                    <p className="text-white/60 text-xs md:text-base">Generate full narrated lessons.</p>
                 </div>
                 <button onClick={() => setShowLibrary(!showLibrary)} className="glass-button px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-bold">
                     <Film size={18} /> Library
                 </button>
             </div>
 
-            {/* Library Overlay */}
             {showLibrary && (
                 <div className="absolute inset-0 z-50 glass-panel bg-[#1a0b10]/95 backdrop-blur-xl p-6 flex flex-col">
                     <div className="flex justify-between items-center mb-4 border-b border-white/10 pb-4">
@@ -208,46 +179,43 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ userId }) => {
                 </div>
             )}
 
-            {/* Main Workspace */}
             <div className="flex-1 flex flex-col items-center justify-center min-h-0">
                 {currentSlides.length > 0 ? (
                     <div className="w-full h-full flex flex-col gap-4">
-                        {/* Player Frame */}
                         <div 
                             ref={playerContainerRef}
                             className={`relative bg-black overflow-hidden shadow-2xl border border-white/10 group flex flex-col md:flex-row
-                                ${isFullscreen ? 'fixed inset-0 z-[100] rounded-none' : 'w-full h-full max-h-[70vh] rounded-3xl'}
+                                ${isFullscreen ? 'fixed inset-0 z-[100] rounded-none' : 'w-full h-full max-h-[70vh] rounded-2xl md:rounded-3xl'}
                             `}
                         >
-                            {/* Left: Image (40% width in desktop, top in mobile) */}
-                            <div className="md:w-5/12 h-1/2 md:h-full relative overflow-hidden bg-gray-900 border-r border-white/10">
+                            {/* Image Section - Takes full width on mobile, 40% on desktop */}
+                            <div className="w-full md:w-5/12 h-[250px] md:h-full relative overflow-hidden bg-gray-900 border-b md:border-b-0 md:border-r border-white/10 shrink-0">
                                 <img 
                                     key={currentSlideIndex} 
                                     src={currentSlides[currentSlideIndex].imageUrl} 
                                     className="w-full h-full object-cover"
                                     alt="Slide Visual"
                                 />
-                                {/* Photographer Credit */}
                                 <div className="absolute bottom-2 left-2 bg-black/50 backdrop-blur-sm px-2 py-1 rounded text-[10px] text-white/70">
                                     📸 {currentSlides[currentSlideIndex].photographer} | Pexels
                                 </div>
                             </div>
 
-                            {/* Right: Text (60% width) */}
-                            <div className="md:w-7/12 h-1/2 md:h-full bg-[#0a0a0f] p-6 md:p-10 flex flex-col justify-center relative overflow-y-auto custom-scrollbar">
+                            {/* Text Section */}
+                            <div className="w-full md:w-7/12 h-full bg-[#0a0a0f] p-6 md:p-10 flex flex-col justify-center relative overflow-y-auto custom-scrollbar">
                                 <div key={currentSlideIndex}>
-                                    <h3 className={`font-bold text-rose-400 mb-4 uppercase tracking-wider opacity-80 ${isFullscreen ? 'text-lg md:text-xl' : 'text-xs'}`}>
+                                    <h3 className={`font-bold text-rose-400 mb-2 md:mb-4 uppercase tracking-wider opacity-80 ${isFullscreen ? 'text-lg md:text-xl' : 'text-xs'}`}>
                                         Slide {currentSlideIndex + 1} / {currentSlides.length}
                                     </h3>
-                                    <p className={`font-medium text-white leading-relaxed font-sans ${isFullscreen ? 'text-lg md:text-2xl leading-loose' : 'text-xs md:text-sm'}`}>
+                                    <p className={`font-medium text-white leading-relaxed font-sans ${isFullscreen ? 'text-lg md:text-2xl leading-loose' : 'text-sm md:text-base'}`}>
                                         {currentSlides[currentSlideIndex].text}
                                     </p>
                                 </div>
+                                <div className="h-16 md:hidden"></div>
                             </div>
 
-                            {/* Control Bar (Overlay on bottom) */}
-                            <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black/80 to-transparent p-4 flex flex-col gap-2 transition-opacity duration-300 ${isFullscreen && !isPlaying ? 'opacity-100' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'}`}>
-                                {/* Progress Slider */}
+                            {/* Controls */}
+                            <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black/90 to-transparent p-4 flex flex-col gap-2 transition-opacity duration-300 ${isFullscreen && !isPlaying ? 'opacity-100' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'}`}>
                                 <input 
                                     type="range" 
                                     min="0" 
@@ -268,10 +236,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ userId }) => {
                                     </div>
 
                                     <div className="flex items-center gap-3">
-                                        <button 
-                                            onClick={handleSave} 
-                                            className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors"
-                                        >
+                                        <button onClick={handleSave} className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors">
                                             <Save size={14}/> Save
                                         </button>
                                         <button onClick={toggleFullscreen} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
@@ -282,7 +247,6 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ userId }) => {
                             </div>
                         </div>
 
-                        {/* Top Bar Controls (When not fullscreen) */}
                         {!isFullscreen && (
                             <div className="flex justify-between items-center px-2">
                                 <div className="flex items-center gap-4 opacity-70">
@@ -297,16 +261,16 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ userId }) => {
                     </div>
                 ) : (
                     <div className="text-center w-full max-w-lg p-6">
-                        <div className="w-32 h-32 bg-rose-500/20 rounded-full flex items-center justify-center mx-auto mb-8 relative">
-                            <Clapperboard size={64} className="text-rose-400" />
+                        <div className="w-24 h-24 md:w-32 md:h-32 bg-rose-500/20 rounded-full flex items-center justify-center mx-auto mb-8 relative">
+                            <Clapperboard size={48} className="text-rose-400 md:w-16 md:h-16" />
                             <div className="absolute inset-0 border-4 border-rose-500/30 rounded-full"></div>
                         </div>
-                        <h2 className="text-3xl font-bold mb-4">What shall we learn?</h2>
-                        <p className="text-white/60 mb-8">Enter a topic, and I'll create a 3-minute narrated lesson with rich visuals.</p>
+                        <h2 className="text-2xl md:text-3xl font-bold mb-4">What shall we learn?</h2>
+                        <p className="text-white/60 mb-8 text-sm md:text-base">Enter a topic, and I'll create a 3-minute narrated lesson.</p>
                         
                         <div className="relative">
                             <input 
-                                className="w-full bg-white/10 border border-white/20 rounded-full px-8 py-5 text-lg outline-none focus:border-rose-400 transition-colors pr-32 shadow-xl"
+                                className="w-full bg-white/10 border border-white/20 rounded-full px-6 py-4 md:px-8 md:py-5 text-base md:text-lg outline-none focus:border-rose-400 transition-colors pr-28 md:pr-32 shadow-xl"
                                 placeholder="e.g. The Structure of an Atom"
                                 value={topic}
                                 onChange={(e) => setTopic(e.target.value)}
@@ -315,10 +279,11 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ userId }) => {
                             <button 
                                 onClick={handleGenerate}
                                 disabled={loading || !topic}
-                                className="absolute right-2 top-2 bottom-2 px-6 rounded-full bg-gradient-to-r from-rose-500 to-pink-600 font-bold hover:scale-105 active:scale-95 transition-all shadow-lg disabled:opacity-50 disabled:scale-100 flex items-center gap-2"
+                                className="absolute right-2 top-2 bottom-2 px-4 md:px-6 rounded-full bg-gradient-to-r from-rose-500 to-pink-600 font-bold hover:scale-105 active:scale-95 transition-all shadow-lg disabled:opacity-50 flex items-center gap-2 text-sm md:text-base"
                             >
                                 {loading ? <Loader2 className="animate-spin" /> : <Sparkles size={18} />}
-                                {loading ? 'Creating...' : 'Generate'}
+                                <span className="hidden md:inline">{loading ? 'Creating...' : 'Generate'}</span>
+                                <span className="md:hidden">{loading ? '' : 'Go'}</span>
                             </button>
                         </div>
                     </div>

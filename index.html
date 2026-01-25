@@ -1,7 +1,7 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <meta name="google-site-verification" content="nsmNVJNAHHQBpbnNwngkSEliSHTyd1o6ohBcd3nVO-Y" />
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Science Buddy - Class 8</title>
@@ -30,6 +30,12 @@
                 300: 'rgba(255, 255, 255, 0.15)',
                 400: 'rgba(255, 255, 255, 0.25)',
               }
+            },
+            keyframes: {
+              shimmer: {
+                '0%': { transform: 'translateX(-100%)' },
+                '100%': { transform: 'translateX(100%)' }
+              }
             }
           }
         }
@@ -45,9 +51,7 @@
       }
 
       body {
-        /* Default Dark Gradient Theme */
-        background: linear-gradient(125deg, #020024, #090979, #2d0042, #000000);
-        background-size: 300% 300%;
+        /* App controls background via Theme */
         color: var(--text-color);
         margin: 0;
         overflow: hidden;

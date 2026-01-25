@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { Upload, FileText, Loader2, Play, Headphones, Network, Zap, Download, Trash2, Pause, ChevronLeft, MessageSquare, Send, CheckCircle, XCircle } from 'lucide-react';
-import { generateResearchTitle, generateSummaryFromText, generateQuizFromText, generateInfographicFromText, generatePodcastScriptFromText, chatWithResearchDocument } from '../services/aiService';
+import { generateResearchTitle, generateSummaryFromText, generateQuizFromText, generatePodcastScriptFromText } from '../services/aiService';
 import { ResearchProject, ChatMessage } from '../types';
 import { ConceptMap } from './CreativeTools';
 import { renderRichText } from '../utils/textUtils';
@@ -44,11 +45,7 @@ const ResearchMode: React.FC<ResearchModeProps> = ({ userId, username }) => {
 
     useEffect(() => {
         if (activeTab === 'CHAT') {
-            chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-        }
-        // Reset quiz state when switching projects or tabs
-        if (activeTab !== 'QUIZ') {
-             // Optional: keep state if they switch back? For now, simple reset if project changes
+            setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
         }
     }, [activeTab, currentProject?.chat_history, chatLoading]);
 
@@ -59,6 +56,37 @@ const ResearchMode: React.FC<ResearchModeProps> = ({ userId, username }) => {
             setQuizScore(0);
         }
     }, [currentProject?.id]);
+
+    // --- DIRECT AI UTILITIES FOR RESEARCH LAB ---
+    const getGroqKey = async () => {
+        const { data } = await supabase.from('app_secrets').select('value').eq('name', 'GROQ_API_KEY').single();
+        return data?.value;
+    };
+
+    const callDirectAI = async (messages: any[], jsonMode: boolean = false) => {
+        const apiKey = await getGroqKey();
+        if (!apiKey) throw new Error("API Key not found");
+
+        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${apiKey}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                model: "llama-3.3-70b-versatile",
+                messages: messages,
+                temperature: 0.5,
+                max_tokens: 4096,
+                response_format: jsonMode ? { type: "json_object" } : undefined
+            })
+        });
+
+        if (!response.ok) throw new Error("AI Service Busy");
+        const data = await response.json();
+        return data.choices[0].message.content;
+    };
+    // --------------------------------------------
 
     const fetchResearches = async () => {
         const { data } = await supabase
@@ -206,21 +234,76 @@ const ResearchMode: React.FC<ResearchModeProps> = ({ userId, username }) => {
         }
     }, [currentLine]);
 
-    // Other Tabs
+    // --- OTHER GENERATORS ---
     const handleGenerateSummary = async () => { if (!currentProject) return; setIsGenerating(true); const summary = await generateSummaryFromText(currentProject.source_text); await updateProjectInDb({ summary }); setIsGenerating(false); };
     const handleGenerateQuiz = async () => { if (!currentProject) return; setIsGenerating(true); const questions = await generateQuizFromText(currentProject.source_text); await updateProjectInDb({ quiz_data: questions }); setIsGenerating(false); };
-    const handleGenerateGraph = async () => { if (!currentProject) return; setIsGenerating(true); const graphData = await generateInfographicFromText(currentProject.source_text); await updateProjectInDb({ infographic_data: graphData }); setIsGenerating(false); };
+    
+    // --- FIXED GRAPH GENERATOR ---
+    const handleGenerateGraph = async () => { 
+        if (!currentProject) return; 
+        setIsGenerating(true); 
+        try {
+            const prompt = `Analyze this text and create a concept map structure JSON.
+            Rules:
+            1. Root node is the main topic.
+            2. Children are key sub-concepts.
+            3. Description should be short (15 words max).
+            Output STRICT JSON format: { "root": { "label": "Main Topic", "description": "..." }, "children": [ { "label": "Subconcept", "description": "..." } ] }
+            
+            TEXT: "${currentProject.source_text.slice(0, 4000)}"`; // Increased context limit for graph
+
+            const response = await callDirectAI([{ role: 'user', content: prompt }], true);
+            
+            // CLEAN RESPONSE BEFORE PARSING
+            let cleanResponse = response.trim();
+            if (cleanResponse.startsWith('```json')) {
+                cleanResponse = cleanResponse.replace(/^```json/, '').replace(/```$/, '').trim();
+            } else if (cleanResponse.startsWith('```')) {
+                cleanResponse = cleanResponse.replace(/^```/, '').replace(/```$/, '').trim();
+            }
+
+            const graphData = JSON.parse(cleanResponse);
+            
+            await updateProjectInDb({ infographic_data: graphData }); 
+        } catch(e) {
+            console.error(e);
+            showToast("Failed to generate graph.", 'error');
+        }
+        setIsGenerating(false); 
+    };
+
+    // --- FIXED CHAT HANDLER ---
     const handleChatSend = async () => { 
         if (!currentProject || !chatInput.trim()) return; 
+        
         const userMsg: ChatMessage = { id: Date.now().toString(), role: 'user', text: chatInput, timestamp: Date.now() }; 
         const newHistory = [...(currentProject.chat_history || []), userMsg];
-        setCurrentProject({ ...currentProject, chat_history: newHistory }); setChatInput(''); setChatLoading(true);
+        
+        // Update UI immediately
+        setCurrentProject({ ...currentProject, chat_history: newHistory }); 
+        setChatInput(''); 
+        setChatLoading(true);
+        
         try { 
-            const historyForAI = newHistory.slice(-10).map(h => ({ role: h.role, text: h.text }));
-            const response = await chatWithResearchDocument(userMsg.text, historyForAI, currentProject.source_text);
-            const aiMsg: ChatMessage = { id: (Date.now() + 1).toString(), role: 'model', text: response || "Error.", timestamp: Date.now() };
+            // Construct context-aware prompt
+            const contextText = currentProject.source_text.slice(0, 15000); // 15k chars context
+            const historyForAI = newHistory.slice(-6).map(h => ({ role: h.role === 'model' ? 'assistant' : 'user', content: h.text }));
+            
+            const messages = [
+                { role: "system", content: `You are a helpful research assistant analyzing a specific document. Answer the user's question based strictly on the document context provided below. If the answer isn't in the document, say so.` },
+                { role: "user", content: `DOCUMENT CONTEXT:\n${contextText}` },
+                ...historyForAI
+            ];
+
+            const response = await callDirectAI(messages);
+            
+            const aiMsg: ChatMessage = { id: (Date.now() + 1).toString(), role: 'model', text: response || "I couldn't process that.", timestamp: Date.now() };
+            
+            // Save to DB
             await updateProjectInDb({ chat_history: [...newHistory, aiMsg] });
-        } catch(e) {}
+        } catch(e) {
+            showToast("Chat Error. Try again.", 'error');
+        }
         setChatLoading(false);
     };
 
@@ -288,8 +371,34 @@ const ResearchMode: React.FC<ResearchModeProps> = ({ userId, username }) => {
 
                 {activeTab === 'CHAT' && (
                     <div className="h-full flex flex-col">
-                        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4">{currentProject?.chat_history?.map(msg => <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : ''}`}><div className={`max-w-[85%] rounded-2xl p-4 ${msg.role === 'user' ? 'bg-cyan-900/40 border-cyan-500/30' : 'bg-white/10'}`}>{renderRichText(msg.text)}</div></div>)}<div ref={chatEndRef} /></div>
-                        <div className="p-4 bg-black/20 border-t border-white/10 flex gap-2"><input value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleChatSend()} className="flex-1 bg-white/10 border border-white/10 rounded-xl px-4 py-3" placeholder="Ask about the note..." /><button onClick={handleChatSend} className="p-3 bg-cyan-600 rounded-xl"><Send size={20}/></button></div>
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4">
+                            {currentProject?.chat_history?.length === 0 && (
+                                <div className="text-center opacity-40 mt-10">Ask any question about your document!</div>
+                            )}
+                            {currentProject?.chat_history?.map(msg => (
+                                <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : ''}`}>
+                                    <div className={`max-w-[85%] rounded-2xl p-4 shadow-lg ${msg.role === 'user' ? 'bg-cyan-900/40 border-cyan-500/30' : 'bg-white/10'}`}>
+                                        <p className="text-xs opacity-50 font-bold mb-1 uppercase">{msg.role === 'user' ? 'You' : 'Research Bot'}</p>
+                                        {renderRichText(msg.text)}
+                                    </div>
+                                </div>
+                            ))}
+                            {chatLoading && (
+                                <div className="flex justify-start"><div className="bg-white/10 p-3 rounded-xl rounded-tl-none animate-pulse">Thinking...</div></div>
+                            )}
+                            <div ref={chatEndRef} />
+                        </div>
+                        <div className="p-4 bg-black/20 border-t border-white/10 flex gap-2">
+                            <input 
+                                value={chatInput} 
+                                onChange={e => setChatInput(e.target.value)} 
+                                onKeyDown={e => e.key === 'Enter' && handleChatSend()} 
+                                disabled={chatLoading}
+                                className="flex-1 bg-white/10 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-cyan-400" 
+                                placeholder="Ask about specific details..." 
+                            />
+                            <button onClick={handleChatSend} disabled={chatLoading} className="p-3 bg-cyan-600 rounded-xl disabled:opacity-50"><Send size={20}/></button>
+                        </div>
                     </div>
                 )}
 
@@ -302,7 +411,7 @@ const ResearchMode: React.FC<ResearchModeProps> = ({ userId, username }) => {
                     ) : (
                         <div className="flex-1 overflow-y-auto custom-scrollbar p-8">
                              {showQuizResults && (
-                                <div className="mb-8 p-6 bg-green-500/20 border border-green-500 rounded-2xl text-center">
+                                <div className="mb-8 p-6 bg-green-500/20 border border-green-500 rounded-2xl text-center animate-in zoom-in">
                                     <h3 className="text-2xl font-bold mb-2">Quiz Results</h3>
                                     <p className="text-lg">You scored <span className="text-green-400 font-bold">{quizScore}</span> out of {currentProject.quiz_data.length}</p>
                                 </div>
