@@ -9,9 +9,10 @@ import { Clapperboard, Play, Pause, Save, Loader2, Sparkles, Film, Trash2, SkipF
 
 interface VideoGeneratorProps {
     userId: string;
+    userClass?: string;
 }
 
-const VideoGenerator: React.FC<VideoGeneratorProps> = ({ userId }) => {
+const VideoGenerator: React.FC<VideoGeneratorProps> = ({ userId, userClass = '8' }) => {
     const [topic, setTopic] = useState('');
     const [loading, setLoading] = useState(false);
     const [currentSlides, setCurrentSlides] = useState<VideoSlide[]>([]);
@@ -46,7 +47,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ userId }) => {
         stopPlayback();
         setLoading(true);
         try {
-            const slides = await createVideoProject(topic);
+            const slides = await createVideoProject(topic, userClass);
             setCurrentSlides(slides);
             setCurrentSlideIndex(0);
             slideIndexRef.current = 0;
@@ -145,7 +146,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ userId }) => {
             <div className="flex justify-between items-center mb-6">
                 <div>
                     <h2 className="text-2xl md:text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-pink-400 to-rose-400 flex items-center gap-2">
-                        <Clapperboard className="text-rose-400" /> AI Video Lab
+                        <Clapperboard className="text-rose-400" /> AI Video Lab (Class {userClass})
                     </h2>
                     <p className="text-white/60 text-xs md:text-base">Generate full narrated lessons.</p>
                 </div>

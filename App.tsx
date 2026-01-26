@@ -312,6 +312,7 @@ const App: React.FC = () => {
                 userInterests={user!.interests}
                 onBack={() => setSelectedTopic(null)}
                 onScoreUpdate={() => {}} 
+                userClass={user!.class_level}
             />;
         }
         return <TopicsDashboard 
@@ -337,10 +338,10 @@ const App: React.FC = () => {
           return <YourFeed userId={user!.id} username={user!.display_name || user!.username} avatarUrl={user!.avatar_url} />;
       case AppView.PERFORMANCE:
           return <PerformanceAnalytics userId={user!.id} username={user!.username} currentUserPoints={user!.total_points || 0} />;
-      case AppView.RESEARCH: return <ResearchMode userId={user!.id} username={user!.username} />;
+      case AppView.RESEARCH: return <ResearchMode userId={user!.id} username={user!.username} userClass={user!.class_level} />;
       case AppView.COMMUNITY: return <CommunityNotes userId={user!.id} username={user!.username} />;
       case AppView.DISCUSSION: return <DiscussionBoard user={user} />;
-      case AppView.VIDEO_GEN: return <VideoGenerator userId={user!.id} />;
+      case AppView.VIDEO_GEN: return <VideoGenerator userId={user!.id} userClass={user!.class_level} />;
       case AppView.CHAT: 
         return <ChatInterface 
             userProfile={{ name: user?.username, interests: user?.interests }} 
@@ -356,13 +357,13 @@ const App: React.FC = () => {
         />;
       case AppView.LEADERBOARD: 
         return <Leaderboard currentUserId={user!.id} currentUserPoints={user!.total_points || 0} />;
-      case AppView.STORY: return <InteractiveStory />;
-      case AppView.QUIZ: return <QuizModule />;
-      case AppView.STYLE_SWAPPER: return <StyleSwapper />;
-      case AppView.CONCEPT_MAP: return <ConceptMap userId={user!.id} />;
-      case AppView.STUDY_POD: return <StudyPod userId={user!.id} />;
-      case AppView.PUZZLE: return <WordPuzzle />;
-      case AppView.MATCHING: return <MindMatch />;
+      case AppView.STORY: return <InteractiveStory userClass={user!.class_level} />;
+      case AppView.QUIZ: return <QuizModule userClass={user!.class_level} />;
+      case AppView.STYLE_SWAPPER: return <StyleSwapper userClass={user!.class_level} />;
+      case AppView.CONCEPT_MAP: return <ConceptMap userId={user!.id} userClass={user!.class_level} />;
+      case AppView.STUDY_POD: return <StudyPod userId={user!.id} userClass={user!.class_level} />;
+      case AppView.PUZZLE: return <WordPuzzle userClass={user!.class_level} />;
+      case AppView.MATCHING: return <MindMatch userClass={user!.class_level} />;
       default: return null;
     }
   };
@@ -421,7 +422,7 @@ const App: React.FC = () => {
       return (
           <>
             <ToastContainer />
-            <StudyMode userId={user.id} userInterests={user.interests} onExit={() => setIsStudyMode(false)} />
+            <StudyMode userId={user.id} userInterests={user.interests} onExit={() => setIsStudyMode(false)} userClass={user.class_level} />
           </>
       );
   }

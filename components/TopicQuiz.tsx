@@ -13,9 +13,10 @@ interface TopicQuizProps {
     userInterests: string;
     onBack: () => void;
     onScoreUpdate?: (points: number) => void;
+    userClass?: string;
 }
 
-const TopicQuiz: React.FC<TopicQuizProps> = ({ userId, topic, userInterests, onBack, onScoreUpdate }) => {
+const TopicQuiz: React.FC<TopicQuizProps> = ({ userId, topic, userInterests, onBack, onScoreUpdate, userClass = '8' }) => {
     const [questions, setQuestions] = useState<QuizQuestion[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [score, setScore] = useState(0);
@@ -56,11 +57,12 @@ const TopicQuiz: React.FC<TopicQuizProps> = ({ userId, topic, userInterests, onB
 
     const generateNewQuiz = async () => {
         setGenerating(true);
-        // Generate 30 questions with a random seed
+        // Generate 15 questions with a random seed
         const seed = Date.now().toString();
-        const newQuestions = await generateQuizQuestions(topic, 30, userInterests, seed);
+        // Passed userClass strictly as 4th arg
+        const newQuestions = await generateQuizQuestions(topic, 15, userInterests, userClass, seed);
         
-        if (newQuestions.length > 0) {
+        if (newQuestions && newQuestions.length > 0) {
             // Save to DB
             const { error } = await supabase
                 .from('quiz_progress')
@@ -75,7 +77,7 @@ const TopicQuiz: React.FC<TopicQuizProps> = ({ userId, topic, userInterests, onB
             
             if (error) {
                 console.error("Error saving quiz", error);
-                showToast("Failed to save quiz progress.", 'error');
+                // Continue locally even if save fails
             }
 
             setQuestions(newQuestions);
@@ -83,7 +85,7 @@ const TopicQuiz: React.FC<TopicQuizProps> = ({ userId, topic, userInterests, onB
             setScore(0);
             setIsComplete(false);
         } else {
-            showToast("Failed to generate questions. Please try again.", 'error');
+            showToast("Failed to generate valid questions. Please try again.", 'error');
             onBack();
         }
         setGenerating(false);
@@ -98,7 +100,7 @@ const TopicQuiz: React.FC<TopicQuizProps> = ({ userId, topic, userInterests, onB
         setSelectedOption(option);
         const currentQ = questions[currentIndex];
         
-        // Robust comparison
+        // Robust comparison: Check exact text match (case-insensitive)
         const correct = normalize(option) === normalize(currentQ.correctAnswer);
         setIsCorrect(correct);
 
@@ -149,8 +151,8 @@ const TopicQuiz: React.FC<TopicQuizProps> = ({ userId, topic, userInterests, onB
                     <div className="absolute inset-0 bg-cyan-500/20 rounded-full blur-xl animate-pulse"></div>
                     <Loader2 size={64} className="text-cyan-400 animate-spin relative z-10" />
                 </div>
-                <h2 className="text-2xl font-bold mb-2">Generating Quiz...</h2>
-                <p className="opacity-60">Crafting personalized questions about {topic} based on your interest in {userInterests}.</p>
+                <h2 className="text-2xl font-bold mb-2">Creating Quiz...</h2>
+                <p className="opacity-60">Consulting Class {userClass} NCERT Textbook about "{topic}"...</p>
                 <p className="text-xs opacity-40 mt-4">This uses advanced AI and might take a few seconds.</p>
             </div>
         );
@@ -222,8 +224,8 @@ const TopicQuiz: React.FC<TopicQuizProps> = ({ userId, topic, userInterests, onB
                     let btnClass = "glass-button p-5 rounded-xl text-left transition-all hover:bg-white/10 border border-white/10 relative overflow-hidden group";
                     let icon = <div className="w-6 h-6 rounded-full border border-white/30 flex items-center justify-center text-xs group-hover:border-white/80">{String.fromCharCode(65 + i)}</div>;
                     
-                    // Robust check for styling
                     const isSelected = selectedOption === opt;
+                    // Check against exact string
                     const isThisCorrect = normalize(opt) === normalize(currentQ.correctAnswer);
 
                     if (selectedOption) {

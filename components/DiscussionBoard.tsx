@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { DiscussionThread, DiscussionComment } from '../types';
-import { MessageCircle, Plus, Search, User, ArrowLeft, Send, Loader2, X, AlertTriangle, Lock, CheckCircle, MoreVertical, Paperclip, GraduationCap } from 'lucide-react';
+import { MessageCircle, Plus, Search, User, ArrowLeft, Send, Loader2, X, AlertTriangle, Lock, CheckCircle, MoreVertical, Paperclip, GraduationCap, Bot } from 'lucide-react';
 import { showToast } from '../utils/notificationUtils';
 import { checkAndAwardDailyXP, checkContentSafety } from '../services/aiService';
 import { Skeleton } from './Skeleton';
@@ -563,9 +563,9 @@ const DiscussionBoard: React.FC<DiscussionBoardProps> = ({ user }) => {
                             </div>
 
                             {user.role !== 'teacher' && (
-                                <div className="flex items-center gap-2 bg-yellow-500/10 p-3 rounded-lg border border-yellow-500/20">
-                                    <AlertTriangle size={16} className="text-yellow-500 shrink-0"/>
-                                    <p className="text-xs text-yellow-200/70">AI Moderator is active. Keep it kind & scientific.</p>
+                                <div className="flex items-center gap-3 bg-cyan-900/20 p-3 rounded-lg border border-cyan-500/30">
+                                    <Bot size={18} className="text-cyan-400 shrink-0 animate-pulse"/>
+                                    <p className="text-xs text-cyan-200/80 font-medium">AI Moderator active. Ensuring a safe & scientific environment.</p>
                                 </div>
                             )}
                         </div>

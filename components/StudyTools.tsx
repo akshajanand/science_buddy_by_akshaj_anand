@@ -7,8 +7,12 @@ import { speechManager } from '../utils/audioUtils';
 import { supabase } from '../services/supabaseClient';
 import { showToast } from '../utils/notificationUtils';
 
+interface MindMatchProps {
+    userClass?: string;
+}
+
 // --- Mind Match Component ---
-export const MindMatch: React.FC = () => {
+export const MindMatch: React.FC<MindMatchProps> = ({ userClass = '8' }) => {
     const [topic, setTopic] = useState('');
     const [cards, setCards] = useState<MatchCard[]>([]);
     const [selectedCard, setSelectedCard] = useState<MatchCard | null>(null);
@@ -30,7 +34,7 @@ export const MindMatch: React.FC = () => {
         setMatches(0);
         setSelectedCard(null);
 
-        const pairs = await generateMatchingPairs(topic);
+        const pairs = await generateMatchingPairs(topic, userClass);
         const deck: MatchCard[] = [];
         pairs.forEach(p => {
             deck.push({ id: p.id, text: p.term, type: 'term', isMatched: false });
@@ -73,7 +77,7 @@ export const MindMatch: React.FC = () => {
 
     if (!cards.length && !loading) return (
         <div className="flex flex-col items-center justify-center h-full p-6 text-center animate-in fade-in zoom-in">
-            <Puzzle size={64} className="mb-4 text-green-300" /><h2 className="text-3xl font-bold mb-4">Mind Match</h2>
+            <Puzzle size={64} className="mb-4 text-green-300" /><h2 className="text-3xl font-bold mb-4">Mind Match (Class {userClass})</h2>
             <div className="relative w-full max-w-md"><input className="w-full bg-white/10 rounded-full px-6 py-4 border border-white/20 outline-none focus:border-green-400 transition-colors" placeholder="Topic (e.g. Gravity)" value={topic} onChange={(e) => setTopic(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleStart()} /><button onClick={handleStart} className="absolute right-2 top-2 bottom-2 glass-button px-6 rounded-full active:scale-95 transition-transform bg-green-500/20 hover:bg-green-500/40 font-bold">Start</button></div>
         </div>
     )
@@ -91,10 +95,11 @@ export const MindMatch: React.FC = () => {
 
 interface StudyPodProps {
     userId?: string;
+    userClass?: string;
 }
 
 // --- Study Pod Component ---
-export const StudyPod: React.FC<StudyPodProps> = ({ userId }) => {
+export const StudyPod: React.FC<StudyPodProps> = ({ userId, userClass = '8' }) => {
     const [topic, setTopic] = useState('');
     const [loading, setLoading] = useState(false);
     const [playing, setPlaying] = useState(false);
@@ -156,7 +161,7 @@ export const StudyPod: React.FC<StudyPodProps> = ({ userId }) => {
         setCurrentPodcastLine(-1);
         
         if (mode === 'SUMMARY') {
-            const text = await generateStudyPodSummary(topic);
+            const text = await generateStudyPodSummary(topic, userClass);
             setSummary(text);
             // Auto-play
             speechManager.speak(text, {
@@ -165,7 +170,7 @@ export const StudyPod: React.FC<StudyPodProps> = ({ userId }) => {
                 onEnd: () => setPlaying(false)
             });
         } else {
-            const script = await generatePodcastScript(topic);
+            const script = await generatePodcastScript(topic, userClass);
             setPodcastScript(script);
             // Auto-play
             setCurrentPodcastLine(0);
@@ -316,7 +321,7 @@ export const StudyPod: React.FC<StudyPodProps> = ({ userId }) => {
 
             <div className="flex items-center gap-4 mb-8">
                  <Headphones size={40} className="text-cyan-300" />
-                 <h1 className="text-3xl font-bold">Study Pod</h1>
+                 <h1 className="text-3xl font-bold">Study Pod (Class {userClass})</h1>
             </div>
 
             <div className="flex bg-white/10 p-1 rounded-xl mb-6 w-full max-w-sm">
@@ -368,8 +373,12 @@ export const StudyPod: React.FC<StudyPodProps> = ({ userId }) => {
     );
 };
 
+interface QuizModuleProps {
+    userClass?: string;
+}
+
 // --- Flash Quiz Component ---
-export const QuizModule: React.FC = () => { 
+export const QuizModule: React.FC<QuizModuleProps> = ({ userClass = '8' }) => { 
     const [topic, setTopic] = useState('');
     const [questionCount, setQuestionCount] = useState(5);
     const [questions, setQuestions] = useState<QuizQuestion[]>([]);
@@ -395,7 +404,7 @@ export const QuizModule: React.FC = () => {
         setCurrentIndex(0);
         
         try {
-            const qs = await generateQuizQuestions(topic, questionCount, 'General Science');
+            const qs = await generateQuizQuestions(topic, questionCount, 'General Science', userClass);
             setQuestions(qs);
         } catch(e) { showToast("Failed to gen quiz", 'error'); }
         setLoading(false);
@@ -442,7 +451,7 @@ export const QuizModule: React.FC = () => {
     if (questions.length === 0) return (
         <div className="h-full flex flex-col items-center justify-center p-6 text-center animate-in fade-in">
             <Zap size={64} className="mb-4 text-yellow-300" />
-            <h2 className="text-3xl font-bold mb-4">Flash Quiz</h2>
+            <h2 className="text-3xl font-bold mb-4">Flash Quiz (Class {userClass})</h2>
             <p className="mb-8 opacity-60">Generate a custom test on any topic.</p>
             
             <div className="w-full max-w-md space-y-6">
@@ -554,8 +563,12 @@ export const QuizModule: React.FC = () => {
     );
 };
 
+interface WordPuzzleProps {
+    userClass?: string;
+}
+
 // --- Word Mine (Puzzle) Component ---
-export const WordPuzzle: React.FC = () => { 
+export const WordPuzzle: React.FC<WordPuzzleProps> = ({ userClass = '8' }) => { 
     const [topic, setTopic] = useState('');
     const [words, setWords] = useState<PuzzleWord[]>([]);
     const [grid, setGrid] = useState<string[][]>([]);
@@ -579,7 +592,7 @@ export const WordPuzzle: React.FC = () => {
         setFoundCount(0);
         setSelectedCells([]);
 
-        const puzzleData = await generateWordPuzzle(topic);
+        const puzzleData = await generateWordPuzzle(topic, userClass);
         if (puzzleData.length > 0) {
             // Generate Grid Client Side
             const newGrid = Array(gridSize).fill(null).map(() => Array(gridSize).fill(''));
@@ -681,7 +694,7 @@ export const WordPuzzle: React.FC = () => {
     if (!words.length && !loading) return (
         <div className="h-full flex flex-col items-center justify-center p-6 text-center animate-in fade-in">
             <Grid size={64} className="mb-4 text-cyan-300" />
-            <h2 className="text-3xl font-bold mb-4">Word Mine</h2>
+            <h2 className="text-3xl font-bold mb-4">Word Mine (Class {userClass})</h2>
             <p className="mb-8 opacity-60">Find hidden scientific terms generated by AI.</p>
             <div className="relative w-full max-w-md">
                 <input className="w-full bg-white/10 rounded-full px-6 py-4 border border-white/20 outline-none focus:border-cyan-400 transition-colors" placeholder="Topic (e.g. Atoms)" value={topic} onChange={(e) => setTopic(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && startPuzzle()} />

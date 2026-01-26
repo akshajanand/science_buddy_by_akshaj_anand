@@ -12,9 +12,10 @@ import { showToast } from '../utils/notificationUtils';
 interface ResearchModeProps {
     userId: string;
     username: string;
+    userClass?: string;
 }
 
-const ResearchMode: React.FC<ResearchModeProps> = ({ userId, username }) => {
+const ResearchMode: React.FC<ResearchModeProps> = ({ userId, username, userClass = '8' }) => {
     const [view, setView] = useState<'LIST' | 'WORKSPACE'>('LIST');
     const [researches, setResearches] = useState<ResearchProject[]>([]);
     const [currentProject, setCurrentProject] = useState<ResearchProject | null>(null);
@@ -169,7 +170,7 @@ const ResearchMode: React.FC<ResearchModeProps> = ({ userId, username }) => {
         if (!currentProject) return;
         setIsGenerating(true);
         try {
-            const script = await generatePodcastScriptFromText(currentProject.source_text);
+            const script = await generatePodcastScriptFromText(currentProject.source_text, userClass);
             await updateProjectInDb({ podcast_script: script });
         } catch(e) { showToast("Failed to generate podcast.", 'error'); }
         setIsGenerating(false);
@@ -235,8 +236,8 @@ const ResearchMode: React.FC<ResearchModeProps> = ({ userId, username }) => {
     }, [currentLine]);
 
     // --- OTHER GENERATORS ---
-    const handleGenerateSummary = async () => { if (!currentProject) return; setIsGenerating(true); const summary = await generateSummaryFromText(currentProject.source_text); await updateProjectInDb({ summary }); setIsGenerating(false); };
-    const handleGenerateQuiz = async () => { if (!currentProject) return; setIsGenerating(true); const questions = await generateQuizFromText(currentProject.source_text); await updateProjectInDb({ quiz_data: questions }); setIsGenerating(false); };
+    const handleGenerateSummary = async () => { if (!currentProject) return; setIsGenerating(true); const summary = await generateSummaryFromText(currentProject.source_text, userClass); await updateProjectInDb({ summary }); setIsGenerating(false); };
+    const handleGenerateQuiz = async () => { if (!currentProject) return; setIsGenerating(true); const questions = await generateQuizFromText(currentProject.source_text, userClass); await updateProjectInDb({ quiz_data: questions }); setIsGenerating(false); };
     
     // --- FIXED GRAPH GENERATOR ---
     const handleGenerateGraph = async () => { 
@@ -248,6 +249,7 @@ const ResearchMode: React.FC<ResearchModeProps> = ({ userId, username }) => {
             1. Root node is the main topic.
             2. Children are key sub-concepts.
             3. Description should be short (15 words max).
+            4. Strictly adhere to NCERT Class ${userClass} Level.
             Output STRICT JSON format: { "root": { "label": "Main Topic", "description": "..." }, "children": [ { "label": "Subconcept", "description": "..." } ] }
             
             TEXT: "${currentProject.source_text.slice(0, 4000)}"`; // Increased context limit for graph
@@ -290,7 +292,7 @@ const ResearchMode: React.FC<ResearchModeProps> = ({ userId, username }) => {
             const historyForAI = newHistory.slice(-6).map(h => ({ role: h.role === 'model' ? 'assistant' : 'user', content: h.text }));
             
             const messages = [
-                { role: "system", content: `You are a helpful research assistant analyzing a specific document. Answer the user's question based strictly on the document context provided below. If the answer isn't in the document, say so.` },
+                { role: "system", content: `You are a helpful research assistant analyzing a specific document for a Class ${userClass} student. Answer the user's question based strictly on the document context provided below and keep it simple.` },
                 { role: "user", content: `DOCUMENT CONTEXT:\n${contextText}` },
                 ...historyForAI
             ];
@@ -332,7 +334,7 @@ const ResearchMode: React.FC<ResearchModeProps> = ({ userId, username }) => {
     if (view === 'LIST') return (
         <div className="h-full flex flex-col p-6">
              <div className="mb-8 flex justify-between items-end shrink-0">
-                <div><h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-300 to-indigo-300 mb-2">Research Lab</h2><p className="text-white/60">Analyze documents with AI.</p></div>
+                <div><h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-300 to-indigo-300 mb-2">Research Lab (Class {userClass})</h2><p className="text-white/60">Analyze documents with AI.</p></div>
                 <label className="cursor-pointer glass-button px-6 py-3 rounded-xl flex items-center gap-2 font-bold bg-blue-600/20 hover:bg-blue-600/40 text-blue-100 border-blue-500/30">
                     {processingFile ? <Loader2 className="animate-spin" /> : <Upload size={20} />} <span>Upload Note / Doc</span>
                     <input type="file" accept=".pdf,.txt,.png,.jpg" className="hidden" onChange={handleFileUpload} disabled={processingFile} />
@@ -478,7 +480,7 @@ const ResearchMode: React.FC<ResearchModeProps> = ({ userId, username }) => {
 
                 {activeTab === 'GRAPH' && (
                     !currentProject?.infographic_data ? <div className="flex-1 flex flex-col items-center justify-center opacity-50"><Network size={64} className="mb-4"/><button onClick={handleGenerateGraph} className="glass-button px-8 py-3 rounded-full font-bold">Generate Concept Map</button></div>
-                    : <ConceptMap overrideData={currentProject.infographic_data} />
+                    : <ConceptMap overrideData={currentProject.infographic_data} userClass={userClass} />
                 )}
 
                 {activeTab === 'PODCAST' && (

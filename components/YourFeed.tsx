@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { FeedPost, FeedComment } from '../types';
-import { Upload, Image as ImageIcon, Video, Send, Loader2, User, Trash2, Heart, AlertTriangle, X, MessageCircle, Bookmark, Globe, Lock, GraduationCap } from 'lucide-react';
+import { Upload, Image as ImageIcon, Video, Send, Loader2, User, Trash2, Heart, AlertTriangle, X, MessageCircle, Bookmark, Globe, Lock, GraduationCap, Bot } from 'lucide-react';
 import { showToast } from '../utils/notificationUtils';
 import { checkContentSafety, checkAndAwardDailyXP } from '../services/aiService';
 import { Skeleton } from './Skeleton';
@@ -330,6 +330,13 @@ const YourFeed: React.FC<YourFeedProps> = ({ userId, username, avatarUrl, readOn
             {/* Create Post Section (Only if not readOnly) */}
             {!readOnly && viewMode === 'GLOBAL' && (
                 <div className="glass-panel p-4 rounded-2xl mb-8 border border-white/10 relative z-10 bg-[#1e1e24]/80">
+                    {/* Add AI Badge here */}
+                    {userRole !== 'teacher' && (
+                        <div className="absolute top-4 right-4 flex items-center gap-1.5 px-2 py-1 bg-cyan-900/30 border border-cyan-500/30 rounded-md">
+                            <Bot size={12} className="text-cyan-400"/>
+                            <span className="text-[10px] font-bold text-cyan-200 uppercase tracking-wider">AI Guardrails On</span>
+                        </div>
+                    )}
                     <div className="flex gap-4">
                         <div className="w-10 h-10 rounded-full overflow-hidden border border-white/20 shrink-0 bg-black/20">
                             {avatarUrl ? <img src={avatarUrl} className="w-full h-full object-cover" /> : <User size={24} className="m-2 opacity-50"/>}

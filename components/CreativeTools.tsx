@@ -7,8 +7,12 @@ import { renderRichText } from '../utils/textUtils';
 import { supabase } from '../services/supabaseClient';
 import { showToast } from '../utils/notificationUtils';
 
+interface InteractiveStoryProps {
+    userClass?: string;
+}
+
 // --- Story Component ---
-export const InteractiveStory: React.FC = () => {
+export const InteractiveStory: React.FC<InteractiveStoryProps> = ({ userClass = '8' }) => {
   const [node, setNode] = useState<StoryNode | null>(null);
   const [loading, setLoading] = useState(false);
   const [started, setStarted] = useState(false);
@@ -24,7 +28,7 @@ export const InteractiveStory: React.FC = () => {
   const handleStart = async () => {
     if (!topic) return;
     setLoading(true);
-    const data = await generateStoryNode('', null, topic);
+    const data = await generateStoryNode('', null, topic, userClass);
     if (data) {
         setNode({ ...data, id: 'start' });
         setHistory(data.text);
@@ -36,7 +40,7 @@ export const InteractiveStory: React.FC = () => {
 
   const handleChoice = async (choiceText: string) => {
     setLoading(true);
-    const data = await generateStoryNode(history, choiceText);
+    const data = await generateStoryNode(history, choiceText, topic, userClass);
     if (data) {
         setNode({ ...data, id: Date.now().toString() });
         setHistory(prev => prev + "\n" + data.text);
@@ -49,7 +53,7 @@ export const InteractiveStory: React.FC = () => {
       return (
           <div className="flex flex-col items-center justify-center h-full text-center p-8 animate-in zoom-in">
               <BookOpen size={64} className="mb-4 text-purple-300" />
-              <h2 className="text-3xl font-bold mb-4">Scientific Adventure</h2>
+              <h2 className="text-3xl font-bold mb-4">Scientific Adventure (Class {userClass})</h2>
               <p className="mb-8 max-w-md">Embark on a journey through any scientific concept. Your choices determine the outcome!</p>
               
               <div className="w-full max-w-md space-y-4">
@@ -107,8 +111,12 @@ export const InteractiveStory: React.FC = () => {
   );
 };
 
+interface StyleSwapperProps {
+    userClass?: string;
+}
+
 // --- Style Swapper Component ---
-export const StyleSwapper: React.FC = () => {
+export const StyleSwapper: React.FC<StyleSwapperProps> = ({ userClass = '8' }) => {
     const [input, setInput] = useState('');
     const [style, setStyle] = useState('Pirate');
     const [output, setOutput] = useState('');
@@ -117,7 +125,7 @@ export const StyleSwapper: React.FC = () => {
     const handleSwap = async () => {
         if (!input) return;
         setLoading(true);
-        const res = await rewriteText(input, style);
+        const res = await rewriteText(input, style, userClass);
         setOutput(res);
         setLoading(false);
     }
@@ -158,7 +166,7 @@ export const StyleSwapper: React.FC = () => {
             </div>
 
             <div className="flex-1 flex flex-col gap-4">
-                <h3 className="text-xl font-bold flex items-center gap-2"><Sparkles size={20}/> {style} Version</h3>
+                <h3 className="text-xl font-bold flex items-center gap-2"><Sparkles size={20}/> {style} Version (Class {userClass})</h3>
                 <div className="flex-1 w-full glass-panel bg-black/20 rounded-xl p-4 overflow-y-auto">
                     {output ? renderRichText(output) : <span className="opacity-50 italic">Magic result will appear here...</span>}
                 </div>
@@ -170,6 +178,7 @@ export const StyleSwapper: React.FC = () => {
 interface ConceptMapProps {
     userId?: string;
     overrideData?: any; // For Research Mode to pass data directly
+    userClass?: string;
 }
 
 interface LayoutNode {
@@ -180,7 +189,7 @@ interface LayoutNode {
 }
 
 // --- Concept Map Component ---
-export const ConceptMap: React.FC<ConceptMapProps> = ({ userId, overrideData }) => {
+export const ConceptMap: React.FC<ConceptMapProps> = ({ userId, overrideData, userClass = '8' }) => {
     const [topic, setTopic] = useState('');
     const [data, setData] = useState<{root: any, children: any[]} | null>(null);
     const [layout, setLayout] = useState<LayoutNode[]>([]);
@@ -265,7 +274,7 @@ export const ConceptMap: React.FC<ConceptMapProps> = ({ userId, overrideData }) 
         resetView();
         setLoading(true);
         try {
-            const result = await generateConceptMapData(searchTopic);
+            const result = await generateConceptMapData(searchTopic, userClass);
             if (result && result.root && Array.isArray(result.children)) {
                 setData(result);
                 if (userId) checkAndAwardDailyXP(userId, 15, "Generating Concept Map");
@@ -313,7 +322,7 @@ export const ConceptMap: React.FC<ConceptMapProps> = ({ userId, overrideData }) 
         setHistory(prev => [...prev, data]);
         setLoading(true);
         try {
-            const result = await generateConceptMapData(selectedNode.label);
+            const result = await generateConceptMapData(selectedNode.label, userClass);
             if (result && result.root) {
                 setData(result);
                 setSelectedNode(null);
